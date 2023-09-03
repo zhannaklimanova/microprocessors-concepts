@@ -1,0 +1,55 @@
+# eclipse specific git ignore
+.metadata/
+RemoteSystemsTempFiles/
+.settings/
+
+# STM32 git ignore
+*.mxproject
+
+#Debug
+*/Debug/
+*/debug/
+*/Release/
+*/release
+*.launch
+
+# Prerequisites
+*.d
+
+# Object files
+*.o
+*.ko
+*.obj
+*.elf
+
+# Linker output
+*.ilk
+*.map
+*.exp
+
+# Libraries
+*.lib
+*.a
+*.la
+*.lo
+
+# Shared objects
+*.dll
+*.so
+*.so.*
+*.dylib
+
+# Executables
+*.exe
+*.out
+*.app
+*.i*86
+*.x86_64
+*.hex
+*.bin
+
+# Debug files
+*.dSYM/
+*.su
+*.idb
+*.pdb
