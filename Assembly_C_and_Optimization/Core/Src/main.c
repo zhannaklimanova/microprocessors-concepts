@@ -15,7 +15,6 @@
   *
   ******************************************************************************
   */
-#include "lab1math.h"
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
@@ -87,15 +86,15 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   /* USER CODE BEGIN 2 */
-  // Define our variables and array
+  //////////////////////////////TEST Find Max in Array//////////////////////////////
   float max = 0;
   uint32_t maxIndex;
-  // The max is 88.49 at index 5
-  float array[10] = {48.21, 79.48, 24.27, 28.82, 78.24, 88.49, 31.19, 5.52, 82.70, 77.73};
+  float array[11] = {48.21, 79.48, 48.21, 24.27, 28.82, 78.24, 88.49, 31.19, 5.52, 82.70, 77.73}; // the max is 88.49 at index 6
   uint32_t len_array = sizeof(array) / sizeof(array[0]);
-
-  float pOut = 0;
-  float in = 3;
+  //////////////////////////////TEST Calculate Square Root//////////////////////////////
+  float32_t x = 3.0;
+  float32_t sqrt_x;
+  //////////////////////////////TEST //////////////////////////////
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -105,12 +104,69 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-//	ITM_Port32(31) = 1;
-//	for (uint32_t i = 0; i < 1000; i++)
-//		cMax(&array, len_array, &max, &maxIndex);
-//	ITM_Port32(31) = 2;
-	  cMax(&array, len_array, &max, &maxIndex);
-	  sqrtNewtonRaphson(&in, &pOut);
+	  /*
+	   * ITM_Port32(n) is a location in memory; setting it to a value will generate a trace
+	   * packet with that value as the data. This also generates a time stamp in terms of
+	   * elapsed cycle count and wall-clock time. Because the debugging interface has
+	   * limited bandwidth, we need to take measures to intentionally spread out when
+	   * trace packets are generated (e.g. by putting the test function inside a repeating
+	   * loop). In other words, a single execution does not give enough time to
+	   * measure the delay.
+	   * The code below sends data values 1 and 2 to ITM port 31; the time stamp for value
+	   * 1 indicates the approximate start time, and for value 2, the approximate end time,
+	   * of the execution of 1000 calls to the function. The values are approximate because
+	   * it takes time to write to the ITM port, and using a for loop to time 1000 iterations
+	   * of the function introduces overhead.
+	   */
+//	  //////////////////////////////TEST findMax//////////////////////////////
+//	  ITM_Port32(31) = 1;
+//	  for (uint32_t i=0; i<1000; i++)
+//	  {
+//		  findMax(array, len_array, &max, &maxIndex);
+//	  }
+//	  ITM_Port32(31) = 2;
+//	  //////////////////////////////TEST findMaxAsm//////////////////////////////
+//	  ITM_Port32(31) = 3;
+//	  for (uint32_t i=0; i<1000; i++)
+//	  {
+//		  findMaxAsm(array, len_array, &max, &maxIndex);
+//	  }
+//	  ITM_Port32(31) = 4;
+//	  ////////////////////////////TEST arm_max_f32//////////////////////////////
+//	  ITM_Port32(31) = 5;
+//	  	  for (uint32_t i=0; i<1000; i++)
+//	  	  {
+//	  		arm_max_f32(array, len_array, &max, &maxIndex);
+//	  	  }
+//	  ITM_Port32(31) = 6;
+//
+//	  ////////////////////////////TEST arm_sqrt_f32//////////////////////////////
+//	  ITM_Port32(31) = 7;
+//		  for (uint32_t i=0; i<1000; i++)
+//		  {
+//			arm_sqrt_f32(x, &sqrt_x);
+//		  }
+//	  ITM_Port32(31) = 8;
+//	  ////////////////////////////TEST sqrt//////////////////////////////
+//	  ITM_Port32(31) = 7;
+//		  for (uint32_t i=0; i<1000; i++)
+//		  {
+//			arm_sqrt_f32(x, &sqrt_x);
+//		  }
+//	  ITM_Port32(31) = 8;
+//	  ITM_Port32(31) = 9;
+//		  for (uint32_t i=0; i<1000; i++)
+//		  {
+//			  findSqrt(x, &sqrt_x);
+//		  }
+//	  ITM_Port32(31) = 10;
+	  ITM_Port32(31) = 11;
+		  for (uint32_t i=0; i<1000; i++)
+		  {
+			  findSqrtAsm(x, &sqrt_x);
+		  }
+	  ITM_Port32(31) = 12;
+
 
   }
   /* USER CODE END 3 */
