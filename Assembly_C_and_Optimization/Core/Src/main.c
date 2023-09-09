@@ -92,9 +92,13 @@ int main(void)
   float array[11] = {48.21, 79.48, 48.21, 24.27, 28.82, 78.24, 88.49, 31.19, 5.52, 82.70, 77.73}; // the max is 88.49 at index 6
   uint32_t len_array = sizeof(array) / sizeof(array[0]);
   //////////////////////////////TEST Calculate Square Root//////////////////////////////
-  float32_t x = 3.0;
-  float32_t sqrt_x;
-  //////////////////////////////TEST //////////////////////////////
+  float32_t in = 3.0;
+  float32_t sqrt_in;
+  //////////////////////////////TEST Solve Transcendental Function//////////////////////////////
+  float32_t omega = 25;
+  float32_t phi = 5;
+  float32_t *x;
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -125,6 +129,7 @@ int main(void)
 //		  findMax(array, len_array, &max, &maxIndex);
 //	  }
 //	  ITM_Port32(31) = 2;
+
 //	  //////////////////////////////TEST findMaxAsm//////////////////////////////
 //	  ITM_Port32(31) = 3;
 //	  for (uint32_t i=0; i<1000; i++)
@@ -132,6 +137,7 @@ int main(void)
 //		  findMaxAsm(array, len_array, &max, &maxIndex);
 //	  }
 //	  ITM_Port32(31) = 4;
+
 //	  ////////////////////////////TEST arm_max_f32//////////////////////////////
 //	  ITM_Port32(31) = 5;
 //	  	  for (uint32_t i=0; i<1000; i++)
@@ -144,28 +150,41 @@ int main(void)
 //	  ITM_Port32(31) = 7;
 //		  for (uint32_t i=0; i<1000; i++)
 //		  {
-//			arm_sqrt_f32(x, &sqrt_x);
+//			arm_sqrt_f32(in, &sqrt_in);
 //		  }
 //	  ITM_Port32(31) = 8;
-//	  ////////////////////////////TEST sqrt//////////////////////////////
-//	  ITM_Port32(31) = 7;
-//		  for (uint32_t i=0; i<1000; i++)
-//		  {
-//			arm_sqrt_f32(x, &sqrt_x);
-//		  }
-//	  ITM_Port32(31) = 8;
+
+//	  ////////////////////////////TEST arm_sqrt_f32//////////////////////////////
 //	  ITM_Port32(31) = 9;
 //		  for (uint32_t i=0; i<1000; i++)
 //		  {
-//			  findSqrt(x, &sqrt_x);
+//			arm_sqrt_f32(in, &sqrt_in);
 //		  }
 //	  ITM_Port32(31) = 10;
-	  ITM_Port32(31) = 11;
+
+	  ////////////////////////////TEST findSqrt//////////////////////////////
+//	  ITM_Port32(31) = 11;
+//		  for (uint32_t i=0; i<1000; i++)
+//		  {
+//			  findSqrt(in, &sqrt_in);
+//		  }
+//	  ITM_Port32(31) = 12;
+
+	  ////////////////////////////TEST findSqrtAsm//////////////////////////////
+//	  ITM_Port32(31) = 13;
+//		  for (uint32_t i=0; i<1000; i++)
+//		  {
+//			  findSqrtAsm(in, &sqrt_in);
+//		  }
+//	  ITM_Port32(31) = 14;
+
+	  ////////////////////////////TEST findTranscendental//////////////////////////////
+	  ITM_Port32(31) = 15;
 		  for (uint32_t i=0; i<1000; i++)
 		  {
-			  findSqrtAsm(x, &sqrt_x);
+			  findTranscendental(omega, phi, &x);
 		  }
-	  ITM_Port32(31) = 12;
+	  ITM_Port32(31) = 16;
 
 
   }

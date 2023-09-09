@@ -32,4 +32,20 @@ void findSqrt(float32_t in, float32_t *pOut)
 	}
 }
 
+void findTranscendental(float32_t omega, float32_t phi, float32_t *x)
+{
+	float32_t function = 0;
+	float32_t function_derivative = 0;
+	float32_t xn = 1.0;
+
+	for(uint32_t i=0; i<3; i++)
+	{
+		function = arm_cos_f32(omega*(xn) + phi) - (xn)*(xn);
+		function_derivative = -omega*arm_sin_f32(omega*(xn) + phi)-2*(xn);
+		xn = xn - (function / function_derivative);
+	}
+	*x = xn;
+}
+
+
 
