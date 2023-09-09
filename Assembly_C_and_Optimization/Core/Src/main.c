@@ -97,7 +97,7 @@ int main(void)
   //////////////////////////////TEST Solve Transcendental Function//////////////////////////////
   float32_t omega = 25;
   float32_t phi = 5;
-  float32_t *x;
+  float32_t x;
 
   /* USER CODE END 2 */
 
