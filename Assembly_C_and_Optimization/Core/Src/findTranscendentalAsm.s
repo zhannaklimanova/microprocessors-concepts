@@ -49,18 +49,14 @@ loop:
 
 	// Calculate function
 	VMUL.f32 S22, S18, S18 // xn_xn = xn * xn
-	//PUSH {LR}
 	VMOV.f32 S0, S21 // put input argument for arm_cos_f32 into input register
 	BL arm_cos_f32
-	//POP {LR}
 	VSUB.f32 S19, S0, S22 // S19 contains function = arm_cos_f32(omega*(xn) + phi) - (xn)*(xn)
 
 	// Calculate function_derivative
 	VMUL.f32 S22, S16, S18 // 2_xn = 2 * xn
-	//PUSH {LR}
 	VMOV.f32 S0, S21
 	BL arm_sin_f32
-	//POP {LR}
 	VNMUL.f32 S0, S17, S0
 	VSUB.f32 S20, S0, S22 // S20 contains function_derivative = -omega*arm_sin_f32(omega*(xn) + phi) - 2*(xn)
 

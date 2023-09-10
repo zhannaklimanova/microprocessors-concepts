@@ -187,6 +187,7 @@ int main(void)
 		  }
 	  ITM_Port32(31) = 16;
   }
+
   /* USER CODE END 3 */
 }
 
