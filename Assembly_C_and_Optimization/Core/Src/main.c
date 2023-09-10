@@ -122,79 +122,70 @@ int main(void)
 	   * it takes time to write to the ITM port, and using a for loop to time 1000 iterations
 	   * of the function introduces overhead.
 	   */
-//	  //////////////////////////////TEST findMax//////////////////////////////
-//	  ITM_Port32(31) = 1;
-//	  for (uint32_t i=0; i<1000; i++)
-//	  {
-//		  findMax(array, len_array, &max, &maxIndex);
-//	  }
-//	  ITM_Port32(31) = 2;
 
-//	  //////////////////////////////TEST findMaxAsm//////////////////////////////
-//	  ITM_Port32(31) = 3;
-//	  for (uint32_t i=0; i<1000; i++)
-//	  {
-//		  findMaxAsm(array, len_array, &max, &maxIndex);
-//	  }
-//	  ITM_Port32(31) = 4;
+	  //////////////////////////////TEST findMax//////////////////////////////
+	  ITM_Port32(31) = 1;
+	  for (uint32_t i=0; i<1000; i++)
+	  {
+		  findMax(array, len_array, &max, &maxIndex);
+	  }
+	  ITM_Port32(31) = 2;
 
-//	  ////////////////////////////TEST arm_max_f32//////////////////////////////
-//	  ITM_Port32(31) = 5;
-//	  	  for (uint32_t i=0; i<1000; i++)
-//	  	  {
-//	  		arm_max_f32(array, len_array, &max, &maxIndex);
-//	  	  }
-//	  ITM_Port32(31) = 6;
-//
-//	  ////////////////////////////TEST arm_sqrt_f32//////////////////////////////
-//	  ITM_Port32(31) = 7;
-//		  for (uint32_t i=0; i<1000; i++)
-//		  {
-//			arm_sqrt_f32(in, &sqrt_in);
-//		  }
-//	  ITM_Port32(31) = 8;
+	  //////////////////////////////TEST findMaxAsm//////////////////////////////
+	  ITM_Port32(31) = 3;
+	  for (uint32_t i=0; i<1000; i++)
+	  {
+		  findMaxAsm(array, len_array, &max, &maxIndex);
+	  }
+	  ITM_Port32(31) = 4;
 
-//	  ////////////////////////////TEST arm_sqrt_f32//////////////////////////////
-//	  ITM_Port32(31) = 9;
-//		  for (uint32_t i=0; i<1000; i++)
-//		  {
-//			arm_sqrt_f32(in, &sqrt_in);
-//		  }
-//	  ITM_Port32(31) = 10;
+	  ////////////////////////////TEST arm_max_f32//////////////////////////////
+	  ITM_Port32(31) = 5;
+	  	  for (uint32_t i=0; i<1000; i++)
+	  	  {
+	  		arm_max_f32(array, len_array, &max, &maxIndex);
+	  	  }
+	  ITM_Port32(31) = 6;
 
-	  ////////////////////////////TEST findSqrt//////////////////////////////
-//	  ITM_Port32(31) = 11;
-//		  for (uint32_t i=0; i<1000; i++)
-//		  {
-//			  findSqrt(in, &sqrt_in);
-//		  }
-//	  ITM_Port32(31) = 12;
+	  ////////////////////////////TEST arm_sqrt_f32//////////////////////////////
+	  ITM_Port32(31) = 7;
+		  for (uint32_t i=0; i<1000; i++)
+		  {
+			arm_sqrt_f32(in, &sqrt_in);
+		  }
+	  ITM_Port32(31) = 8;
+
+	  //////////////////////////TEST findSqrt//////////////////////////////
+	  ITM_Port32(31) = 9;
+		  for (uint32_t i=0; i<1000; i++)
+		  {
+			  findSqrt(in, &sqrt_in);
+		  }
+	  ITM_Port32(31) = 10;
 
 	  ////////////////////////////TEST findSqrtAsm//////////////////////////////
-//	  ITM_Port32(31) = 13;
-//		  for (uint32_t i=0; i<1000; i++)
-//		  {
-//			  findSqrtAsm(in, &sqrt_in);
-//		  }
-//	  ITM_Port32(31) = 14;
+	  ITM_Port32(31) = 11;
+		  for (uint32_t i=0; i<1000; i++)
+		  {
+			  findSqrtAsm(in, &sqrt_in);
+		  }
+	  ITM_Port32(31) = 12;
 
 	  ////////////////////////////TEST findTranscendental//////////////////////////////
-//	  ITM_Port32(31) = 15;
-//		  for (uint32_t i=0; i<1000; i++)
-//		  {
-//			  findTranscendental(omega, phi, &x);
-//		  }
-//	  ITM_Port32(31) = 16;
+	  ITM_Port32(31) = 13;
+		  for (uint32_t i=0; i<1000; i++)
+		  {
+			  findTranscendental(omega, phi, &x);
+		  }
+	  ITM_Port32(31) = 14;
 
 	  ////////////////////////////TEST findTranscendentalAsm//////////////////////////////
-//	  findMaxAsm(array, len_array, &max, &maxIndex);
-	  ITM_Port32(31) = 17;
+	  ITM_Port32(31) = 15;
 		  for (uint32_t i=0; i<1000; i++)
 		  {
 			  findTranscendentalAsm(omega, phi, &x);
 		  }
-	  ITM_Port32(31) = 18;
-
+	  ITM_Port32(31) = 16;
   }
   /* USER CODE END 3 */
 }

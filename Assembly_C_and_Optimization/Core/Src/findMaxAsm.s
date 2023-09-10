@@ -33,7 +33,7 @@ loop:
 	SUBS R1, R1, #1 // size = size -1
 	BLT end // loop finishes when R1 < 0
 
-	ADD  R5, R0, R1, LSL#2 // R5 <-- R0 + R1*4 calculates base address (in R5) for the array element (shifting left by k = multiplication by 2^k)
+	ADD R5, R0, R1, LSL#2 // R5 <-- R0 + R1*4 calculates base address (in R5) for the array element (shifting left by k = multiplication by 2^k)
 	VLDR.f32 S1, [R5] // load element into fp register S1 (from address in R5)
 	VCMP.f32 S2, S1 // compare new element with current max
 	VMRS APSR_nzvc, FPSCR // load the floating-point status and control register which holds status flags from fp operations
