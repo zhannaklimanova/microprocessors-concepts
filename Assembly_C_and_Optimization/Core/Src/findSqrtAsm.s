@@ -18,12 +18,11 @@
 .section .text.rodata
 
 /**
-*  void findSqrt(float32_t in, float32_t *pOut);
+*  void findSqrtAsm(float32_t in, float32_t *pOut);
 *
 *  S0: in: input value
 *  R0: *pOut: pointer to the square root of the input value
 */
-
 findSqrtAsm:
 	VSQRT.f32 S1, S0
 	VSTR.f32 S1, [R0]

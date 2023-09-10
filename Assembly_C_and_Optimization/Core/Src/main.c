@@ -95,8 +95,8 @@ int main(void)
   float32_t in = 3.0;
   float32_t sqrt_in;
   //////////////////////////////TEST Solve Transcendental Function//////////////////////////////
-  float32_t omega = 25;
-  float32_t phi = 5;
+  float32_t omega = 25.0;
+  float32_t phi = 5.0;
   float32_t x;
 
   /* USER CODE END 2 */
@@ -179,13 +179,21 @@ int main(void)
 //	  ITM_Port32(31) = 14;
 
 	  ////////////////////////////TEST findTranscendental//////////////////////////////
-	  ITM_Port32(31) = 15;
+//	  ITM_Port32(31) = 15;
+//		  for (uint32_t i=0; i<1000; i++)
+//		  {
+//			  findTranscendental(omega, phi, &x);
+//		  }
+//	  ITM_Port32(31) = 16;
+
+	  ////////////////////////////TEST findTranscendentalAsm//////////////////////////////
+//	  findMaxAsm(array, len_array, &max, &maxIndex);
+	  ITM_Port32(31) = 17;
 		  for (uint32_t i=0; i<1000; i++)
 		  {
-			  findTranscendental(omega, phi, &x);
+			  findTranscendentalAsm(omega, phi, &x);
 		  }
-	  ITM_Port32(31) = 16;
-
+	  ITM_Port32(31) = 18;
 
   }
   /* USER CODE END 3 */
