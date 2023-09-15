@@ -148,6 +148,7 @@ int main(void)
 	  ITM_Port32(31) = 6;
 
 	  ////////////////////////////TEST arm_sqrt_f32//////////////////////////////
+	  findSqrtTester(&ITM_Port32(31), arm_sqrt_f32);
 	  ITM_Port32(31) = 7;
 		  for (uint32_t i=0; i<1000; i++)
 		  {
@@ -156,6 +157,7 @@ int main(void)
 	  ITM_Port32(31) = 8;
 
 	  //////////////////////////TEST findSqrt//////////////////////////////
+	  findSqrtTester(&ITM_Port32(31), findSqrt);
 	  ITM_Port32(31) = 9;
 		  for (uint32_t i=0; i<1000; i++)
 		  {
@@ -164,6 +166,7 @@ int main(void)
 	  ITM_Port32(31) = 10;
 
 	  ////////////////////////////TEST findSqrtAsm//////////////////////////////
+	  findSqrtTester(&ITM_Port32(31), findSqrtAsm);
 	  ITM_Port32(31) = 11;
 		  for (uint32_t i=0; i<1000; i++)
 		  {

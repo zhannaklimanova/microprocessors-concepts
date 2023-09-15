@@ -31,6 +31,36 @@ void findSqrt(float32_t in, float32_t *pOut)
 		*pOut = 0.5 * (*pOut + in / *pOut);
 	}
 }
+void findSqrtTester(volatile unsigned long *port, void (*findSqrt)(float32_t in, float32_t *pOut)) {
+	double tolerance = 0.00005;
+	// small numbers
+	for (float32_t i = 0.001; i < 1; i+=0.001) {
+		float32_t sqrt;
+		findSqrt(i*i, &sqrt);
+		double diff = fabs(sqrt*sqrt - i*i);
+		if (diff > tolerance) {
+			break;
+		}
+	}
+	// medium numbers
+	for (float32_t i = 0.1; i < 10; i+=0.1) {
+		float32_t sqrt;
+		findSqrt(i*i, &sqrt);
+		double diff = fabs(sqrt*sqrt - i*i);
+		if (diff > tolerance) {
+			break;
+		}
+	}
+	// big numbers
+	for (float32_t i = 1; i < 100; i+=1) {
+		float32_t sqrt;
+		findSqrt(i*i, &sqrt);
+		double diff = fabs(sqrt*sqrt - i*i);
+		if (diff > tolerance) {
+			break;
+		}
+	}
+}
 
 void findTranscendental(float32_t omega, float32_t phi, float32_t *x)
 {
