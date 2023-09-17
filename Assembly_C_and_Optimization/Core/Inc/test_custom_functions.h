@@ -34,5 +34,25 @@
 			} \
 		} while (0);
 
+#define TEST_TRANSCENDENTAL(port, findTranscendental, id) \
+		float32_t actual; \
+		float32_t expected; \
+		do { \
+			double tolerance = 0.0001; \
+			omega = -PI; \
+			for (; omega < PI; omega += 0.001) { \
+				phi = 0; \
+					float32_t solution; \
+					findTranscendental(omega, phi, &solution); \
+					actual = solution * solution; \
+					expected = arm_cos_f32(omega*(solution) + phi); \
+					double diff = fabs(expected - actual); \
+					if (diff > tolerance) { \
+						port = id; \
+						goto go_to_label_##id; \
+					} \
+			} \
+		} while (0); \
+		go_to_label_##id:
 
 #endif /* INC_TEST_CUSTOM_FUNCTIONS_H_ */
