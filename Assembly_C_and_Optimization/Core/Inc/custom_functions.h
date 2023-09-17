@@ -15,7 +15,6 @@ extern void findMaxAsm(float *array, uint32_t size, float *max, uint32_t *maxInd
 
 void findSqrt(float32_t in, float32_t *pOut);
 extern void findSqrtAsm(float32_t in, float32_t *pOut);
-void findSqrtTester(volatile unsigned long *port, void (*findSqrt)(float32_t in, float32_t *pOut));
 
 void findTranscendental(float32_t omega, float32_t phi, float32_t *x);
 extern void findTranscendentalAsm(float32_t omega, float32_t phi, float32_t *x);

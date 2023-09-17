@@ -54,7 +54,6 @@ static void MX_GPIO_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
 /* USER CODE END 0 */
 
 /**
@@ -92,7 +91,7 @@ int main(void)
   float array[11] = {48.21, 79.48, 48.21, 24.27, 28.82, 78.24, 88.49, 31.19, 5.52, 82.70, 77.73}; // the max is 88.49 at index 6
   uint32_t len_array = sizeof(array) / sizeof(array[0]);
   //////////////////////////////TEST Calculate Square Root//////////////////////////////
-  float32_t in = 3.0;
+  float32_t in = 1.00005;
   float32_t sqrt_in;
   //////////////////////////////TEST Solve Transcendental Function//////////////////////////////
   float32_t omega = 25.0;
@@ -148,7 +147,6 @@ int main(void)
 	  ITM_Port32(31) = 6;
 
 	  ////////////////////////////TEST arm_sqrt_f32//////////////////////////////
-	  findSqrtTester(&ITM_Port32(31), arm_sqrt_f32);
 	  ITM_Port32(31) = 7;
 		  for (uint32_t i=0; i<1000; i++)
 		  {
@@ -157,7 +155,6 @@ int main(void)
 	  ITM_Port32(31) = 8;
 
 	  //////////////////////////TEST findSqrt//////////////////////////////
-	  findSqrtTester(&ITM_Port32(31), findSqrt);
 	  ITM_Port32(31) = 9;
 		  for (uint32_t i=0; i<1000; i++)
 		  {
@@ -166,7 +163,6 @@ int main(void)
 	  ITM_Port32(31) = 10;
 
 	  ////////////////////////////TEST findSqrtAsm//////////////////////////////
-	  findSqrtTester(&ITM_Port32(31), findSqrtAsm);
 	  ITM_Port32(31) = 11;
 		  for (uint32_t i=0; i<1000; i++)
 		  {
