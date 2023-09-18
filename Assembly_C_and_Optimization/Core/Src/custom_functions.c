@@ -38,36 +38,35 @@ void findSqrt(float32_t in, float32_t *pOut)
 	}
 }
 
-void findTranscendental(float32_t omega, float32_t phi, float32_t *x)
-{
-	float32_t xn = 1.0;
+void findTranscendental(float32_t omega, float32_t phi, float32_t *x) {
+	const int MAX_ITERATION = 100;
+	float32_t tolerance = 0.00001;
 
 	float32_t function = 0;
 	float32_t function_derivative = 0;
+	float32_t xn = 0.0;
 
-	const int max_iteration = 100;
-
-	float32_t delta = 0;
-	const float32_t delta_mult = omega != 0.0 ? PI / omega : PI;
-	const float32_t max_delta = delta_mult/max_iteration;
-	const float32_t min_delta = -delta_mult/max_iteration;
-
-	for(uint32_t i=0; i<max_iteration; i++)
-	{
-		function = arm_cos_f32(omega*(xn) + phi) - (xn)*(xn);
-		function_derivative = -omega*arm_sin_f32(omega*(xn) + phi)-2*(xn);
-
-		// limit delta
-		delta = function / function_derivative;
-		delta = (delta > max_delta) ? max_delta : delta;
-		delta = (delta < min_delta) ? min_delta : delta;
-
-		if (function_derivative == 0.0) {
-			break;
+	for (uint32_t i = 0; i < MAX_ITERATION; i++) {
+		function = arm_cos_f32(omega * (xn) + phi) - (xn) * (xn);
+		function_derivative = -omega * arm_sin_f32(omega * (xn) + phi) - 2 * (xn);
+		xn = xn - (function / function_derivative);
+		if (xn > 1) {
+			xn = (float32_t)i / (float32_t)MAX_ITERATION;
+		} else if (xn < -1) {
+			xn = -(float32_t)i / (float32_t)MAX_ITERATION;
 		}
 
-		xn = xn - delta;
+//		printf("%f\n", xn);
 	}
-	*x = xn;
+
+//	printf("%f - %f = %f\n", arm_cos_f32(omega * (xn) + phi), xn * xn, function);
+
+	if (function > tolerance || function < -tolerance) {
+		*x = 0.0 / 0.0;
+	} else {
+		*x = xn;
+	}
+
+//	printf("x = %f\n", *x);
 }
 
