@@ -52,10 +52,10 @@ void findTranscendental(float32_t omega, float32_t phi, float32_t *x) {
 		xn = xn - (function / function_derivative);
 
 		// keep xn within the bound [-1, 1]
-		if (xn > 1) {
+		if (xn > 1.5) {
 			// pseudo-pseudo random, ensure a whole range of values are tested
 			xn = (float32_t)i / (float32_t)MAX_ITERATION;
-		} else if (xn < -1) {
+		} else if (xn < -1.5) {
 			// pseudo-pseudo random, ensure a whole range of values are tested
 			xn = -(float32_t)i / (float32_t)MAX_ITERATION;
 		}
@@ -65,7 +65,7 @@ void findTranscendental(float32_t omega, float32_t phi, float32_t *x) {
 
 //	printf("%f - %f = %f\n", arm_cos_f32(omega * (xn) + phi), xn * xn, function);
 
-	// if it's outside the tolerated range, return nan otherwise return solution
+	// if it's outside the tolerated range, return nan otherwise return solutiongit
 	if (function > tolerance || function < -tolerance) {
 		*x = 0.0 / 0.0;
 	} else {
