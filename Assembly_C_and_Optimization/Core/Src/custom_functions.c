@@ -51,7 +51,7 @@ void findTranscendental(float32_t omega, float32_t phi, float32_t *x) {
 		function_derivative = -omega * arm_sin_f32(omega * (xn) + phi) - 2 * (xn);
 		xn = xn - (function / function_derivative);
 
-		// keep xn within the bound [-1, 1]
+		// keep xn within the bound [-1.5, 1.5]
 		if (xn > 1.5) {
 			// pseudo-pseudo random, ensure a whole range of values are tested
 			xn = (float32_t)i / (float32_t)MAX_ITERATION;
@@ -73,5 +73,34 @@ void findTranscendental(float32_t omega, float32_t phi, float32_t *x) {
 	}
 
 //	printf("x = %f\n", *x);
+}
+
+void findTranscendentalWithInitialGuess(float32_t omega, float32_t phi, float32_t x, float32_t *pTrascendentalOut) {
+	const int MAX_ITERATION = 100;
+	float32_t tolerance = 0.00001;
+
+	float32_t function = 0;
+	float32_t function_derivative = 0;
+	float32_t xn = x;
+
+	for (uint32_t i = 0; i < MAX_ITERATION; i++) {
+		function = arm_cos_f32(omega * (xn) + phi) - (xn) * (xn);
+		function_derivative = -omega * arm_sin_f32(omega * (xn) + phi) - 2 * (xn);
+		xn = xn - (function / function_derivative);
+
+		// keep xn within the bound [-1, 1]
+		if (xn > 1.5) {
+			// pseudo-pseudo random, ensure a whole range of values are tested
+			xn = (float32_t)i / (float32_t)MAX_ITERATION;
+		} else if (xn < -1.5) {
+			// pseudo-pseudo random, ensure a whole range of values are tested
+			xn = -(float32_t)i / (float32_t)MAX_ITERATION;
+		}
+	}
+	if (function > tolerance || function < -tolerance) {
+		*pTrascendentalOut = 0.0 / 0.0;
+	} else {
+		*pTrascendentalOut = xn;
+	}
 }
 
