@@ -9,7 +9,7 @@
 // e.g., 16-bit Thumb and 32-bit ARM instructions may be present (and are)
 .syntax unified
 
-// .global exports the label sqrtAsm, which is expected by custom_functions.h
+// .global exports the label findSqrtAsm, which is expected by custom_functions.h
 .global findSqrtAsm
 
 // .section marks a new section in assembly.

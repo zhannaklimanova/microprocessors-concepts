@@ -9,14 +9,14 @@
 // e.g., 16-bit Thumb and 32-bit ARM instructions may be present (and are)
 .syntax unified
 
-// .global exports the label sqrtAsm, which is expected by custom_functions.h
+// .global exports the label findTranscendentalAsm, which is expected by custom_functions.h
 .global findTranscendentalAsm
 
 .section .data
 MAX_ITERATION:
     .float 100.0
 xn_initial:
-    .float 1.0
+    .float 0.0
 one_point_five:
     .float 1.5
 n_one_point_five:
@@ -32,6 +32,13 @@ zero:
 // .rodata marks instructions as read-only, setting it to go in FLASH, no SRAM
 .section .text.rodata
 
+/**
+*  void findTrascendentalAsm(float32_t omega, float32_t phi, float32_t *x);
+*
+*  S0: omega
+*  S1: phi
+*  R0: *x: pointer to value x
+*/
 findTranscendentalAsm:
 	PUSH {LR}
 	PUSH {R4-R8}
@@ -42,10 +49,10 @@ findTranscendentalAsm:
     MOV R6, #100 // MAX_ITERATIONS integer value
 
     LDR R5, =one_point_five // 1.5
-    VLDR.f32 S25, [R5] //
+    VLDR.f32 S25, [R5]
 
     LDR R5, =n_one_point_five // -1.5
-    VLDR.f32 S26, [R5] //
+    VLDR.f32 S26, [R5]
 
     LDR R5, =MAX_ITERATION
     VLDR.f32 S27, [R5]
@@ -76,14 +83,14 @@ loop:
 	VSUB.f32 S19, S0, S22 // S19 contains function = arm_cos_f32(omega*(xn) + phi) - (xn)*(xn)
 
 	// Calculate function_derivative
-	VADD.f32 S22, S18, S18 // 2_xn = 2 * xn
+	VADD.f32 S22, S18, S18 // 2_xn = 2 * xn -> 2 times something is the same as adding that thing twice
 	VMOV.f32 S0, S21
 	BL arm_sin_f32
 	VNMUL.f32 S0, S17, S0
 	VSUB.f32 S20, S0, S22 // S20 contains function_derivative = -omega*arm_sin_f32(omega*(xn) + phi) - 2*(xn)
 
 	// Calculate xn
-	VDIV.f32 S22, S19, S20 // Reuse register S22 to store (function / function_derivative)
+	VDIV.f32 S22, S19, S20 // reuse register S22 to store (function / function_derivative)
 	VSUB.f32 S18, S18, S22 // xn = xn - (function / function_derivative)
 
     VCMP.f32 S18, S25 // xn > 1.5
