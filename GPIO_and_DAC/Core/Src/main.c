@@ -71,7 +71,7 @@ static void MX_ADC3_Init(void);
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-  uint32_t period = 4096; // 15 ms [0, 15] - cannot increment less than 1 ms
+  uint32_t period = 1024; // 15 ms [0, 15] - cannot increment less than 1 ms
   uint32_t samplingRate = 256;
   uint32_t maxDACAmplitude = 256; // send a max of 8-bit number
   uint32_t DACIncrement = maxDACAmplitude / samplingRate;
@@ -84,6 +84,13 @@ int main(void)
   float_t sinIncrement = (2.0 * M_PI) / samplingRate;
   float_t currentSin = 0.0;
   uint32_t sinOut = 0;
+
+
+  // adc temperature variable
+  float vrefScale;
+  uint32_t vTemp;
+  uint32_t vrefint;
+  float celsiusTemperature;
 
   //  uint8_t readDACValue;
   /* USER CODE END 1 */
@@ -123,6 +130,12 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   HAL_DAC_Start(&hdac1, DAC_CHANNEL_1);
   HAL_DAC_Start(&hdac1, DAC_CHANNEL_2);
+
+  HAL_ADC_Start(&hadc1);
+  HAL_ADC_PollForConversion(&hadc1, 200);
+  vrefint = HAL_ADC_GetValue(&hadc1);
+  HAL_ADC_Stop(&hadc1);
+  getVrefRatio(vrefint, &vrefScale);
   while (1)
   {
 //	  buttonLightLED();
@@ -130,30 +143,41 @@ int main(void)
  	  HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_1, DAC_ALIGN_8B_R, currentDACValue);
 	  currentDACValue += DACIncrement;
 	  currentDACValue = currentDACValue % maxDACAmplitude;
-//	  HAL_Delay(waitTimeIncrement);
+	  HAL_Delay(waitTimeIncrement);
 	  ////////////////////////////////////
 
 	  ///////////////// TRIANGLE ///////////
 
-	  currentTriangle = (uint32_t)abs(((int32_t)(currentSAWTriangle - maxDACAmplitude)));
-//	  HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_2, DAC_ALIGN_8B_R, currentTriangle);
-	  currentSAWTriangle += partialSAWTriangle;
-	  currentSAWTriangle = currentSAWTriangle % (2 * maxDACAmplitude);
+//	  currentTriangle = (uint32_t)abs(((int32_t)(currentSAWTriangle - maxDACAmplitude)));
+//	  currentSAWTriangle += partialSAWTriangle;
+//	  currentSAWTriangle = currentSAWTriangle % (2 * maxDACAmplitude);
 
 	  //////////////////////////////////////
 
 	  ///////////////// SIN ///////////
-	  sinOut = (uint32_t)(128 * (arm_sin_f32(currentSin) + 1));
-	  currentSin += sinIncrement;
-	  if (currentSin > (2*M_PI)) {
-		  currentSin = 0.0;
-	  }
-	  HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_2, DAC_ALIGN_8B_R, sinOut);
-
-	  HAL_Delay(waitTimeIncrement);
+//	  sinOut = (uint32_t)(128 * (arm_sin_f32(currentSin) + 1));
+//	  currentSin += sinIncrement;
+//	  if (currentSin > (2*M_PI)) {
+//		  currentSin = 0.0;
+//	  }
+//	  HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_2, DAC_ALIGN_8B_R, sinOut);
+//
+//	  HAL_Delay(waitTimeIncrement);
 
 	  //////////////////////////////////////
 //	  for (uint32_t i=0; i < 2150; i++);
+
+	  ////////////////////ADC///////////////////////////////////
+
+
+	  HAL_ADC_Start(&hadc3);
+	  HAL_ADC_PollForConversion(&hadc3, 200);
+	  vTemp = HAL_ADC_GetValue(&hadc3);
+	  HAL_ADC_Stop(&hadc3);
+
+	  convertV2C(vTemp, &vrefScale, &celsiusTemperature);
+
+	  /////////////////////////////////////////////////////////
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -289,7 +313,7 @@ static void MX_ADC1_Init(void)
   */
   sConfig.Channel = ADC_CHANNEL_VREFINT;
   sConfig.Rank = ADC_REGULAR_RANK_1;
-  sConfig.SamplingTime = ADC_SAMPLETIME_2CYCLES_5;
+  sConfig.SamplingTime = ADC_SAMPLETIME_92CYCLES_5;
   sConfig.SingleDiff = ADC_SINGLE_ENDED;
   sConfig.OffsetNumber = ADC_OFFSET_NONE;
   sConfig.Offset = 0;
@@ -347,7 +371,7 @@ static void MX_ADC3_Init(void)
   */
   sConfig.Channel = ADC_CHANNEL_TEMPSENSOR;
   sConfig.Rank = ADC_REGULAR_RANK_1;
-  sConfig.SamplingTime = ADC_SAMPLETIME_2CYCLES_5;
+  sConfig.SamplingTime = ADC_SAMPLETIME_92CYCLES_5;
   sConfig.SingleDiff = ADC_SINGLE_ENDED;
   sConfig.OffsetNumber = ADC_OFFSET_NONE;
   sConfig.Offset = 0;

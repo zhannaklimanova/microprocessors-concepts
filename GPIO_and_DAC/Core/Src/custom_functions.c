@@ -20,3 +20,20 @@ void buttonLightLED()
 			  break;
 	  }
 }
+
+void convertV2C(uint32_t voltageTemperature, float *vrefScale,  float *celsiusTemperature)
+{
+
+	int32_t dTEMP = TS_CAL2_TEMP - TS_CAL1_TEMP;
+	int32_t dCAL = *TS_CAL2 - *TS_CAL1;
+	float conversionFactor = (float) dTEMP / (float) dCAL;
+	int32_t diff = (float)voltageTemperature * (*vrefScale)-(int32_t)(*TS_CAL1);
+	*celsiusTemperature = conversionFactor * (float) diff + 30.0;
+}
+
+void getVrefRatio(uint32_t voltageRefint, float *vrefScale)
+{
+	float vref = (float)(VREFINT_voltage * (*VREFINT))/(float)voltageRefint;
+	*vrefScale = vref / (float)VREFINT_voltage;
+}
+

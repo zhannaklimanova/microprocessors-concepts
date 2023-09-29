@@ -10,6 +10,15 @@
 
 #include "main.h"
 
+#define TS_CAL1 (uint16_t*)0x1FFF75A8
+#define TS_CAL2 (uint16_t*)0x1FFF75CA
+#define VREFINT (uint16_t*)0x1FFF75AA
+#define TS_CAL1_TEMP 30
+#define TS_CAL2_TEMP 110
+#define VREFINT_voltage 3
+
 void buttonLightLED();
+void convertV2C(uint32_t voltageTemperature, float *vrefScale,  float *celsiusTemperature);
+void getVrefRatio(uint32_t voltageRefint, float *vrefScale);
 
 #endif /* INC_CUSTOM_FUNCTIONS_H_ */
