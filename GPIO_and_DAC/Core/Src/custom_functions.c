@@ -37,3 +37,16 @@ void getVrefRatio(uint32_t voltageRefint, float *vrefScale)
 	*vrefScale = vref / (float)VREFINT_voltage;
 }
 
+
+void delay2K(){
+	for(int32_t i = 0; i<4100;i++);
+}
+
+void delay8K(){
+	for(int32_t i = 0; i<10;i++);
+}
+
+uint32_t temp2frequency(uint32_t frequency){
+	// (5,100) (100,2000)
+	return 44 * frequency - 200;
+}

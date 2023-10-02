@@ -20,5 +20,9 @@
 void buttonLightLED();
 void convertV2C(uint32_t voltageTemperature, float *vrefScale,  float *celsiusTemperature);
 void getVrefRatio(uint32_t voltageRefint, float *vrefScale);
+void delay2K();
+void delay8K();
+uint32_t temp2frequency(uint32_t frequency);
+
 
 #endif /* INC_CUSTOM_FUNCTIONS_H_ */
