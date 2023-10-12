@@ -1,52 +1,57 @@
 /*
- * custom_functions.c
+ * customer_functions.c
  *
  *  Created on: Sep 25, 2023
- *      Author: zhanna
+ *      Author: zklim
  */
 
 #include "custom_functions.h"
 
+/**
+ * @brief turns the LED light on after button press and turns it off after button release.
+ *        Note that the circuit will send a 1 when button is not pressed and create a short-circuit
+ *        and send a 0 when button is pressed - the functionality is adjusted accordingly.
+ *
+ */
 void buttonLightLED()
 {
-	  GPIO_PinState buttonRead = HAL_GPIO_ReadPin(BLUE_BUTTON_GPIO_Port, BLUE_BUTTON_Pin);
-	  switch(buttonRead)
-	  {
-		  case GPIO_PIN_SET:
-			  HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
-			  break;
-		  case GPIO_PIN_RESET:
-			  HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_SET);
-			  break;
-	  }
+	GPIO_PinState buttonStatus = HAL_GPIO_ReadPin(BLUE_BUTTON_GPIO_Port, BLUE_BUTTON_Pin);
+	if (buttonStatus==GPIO_PIN_RESET) // send 0: button pressed
+	{
+		HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_SET);
+	}
+	HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET); // send 1: button not pressed
 }
 
-void convertV2C(uint32_t voltageTemperature, float *vrefScale,  float *celsiusTemperature)
+void generateSAW(uint32_t *currentSAWValue, uint32_t DACIncrement, uint32_t maxDACAmplitude)
 {
-
-	int32_t dTEMP = TS_CAL2_TEMP - TS_CAL1_TEMP;
-	int32_t dCAL = *TS_CAL2 - *TS_CAL1;
-	float conversionFactor = (float) dTEMP / (float) dCAL;
-	int32_t diff = (float)voltageTemperature * (*vrefScale)-(int32_t)(*TS_CAL1);
-	*celsiusTemperature = conversionFactor * (float) diff + 30.0;
+	*currentSAWValue += DACIncrement;
+	*currentSAWValue = *currentSAWValue % maxDACAmplitude;
 }
 
-void getVrefRatio(uint32_t voltageRefint, float *vrefScale)
+void generateTRIANGLE(uint32_t *currentTRIANGLEValue, uint32_t currentSAWValue, uint32_t maxDACAmplitude)
 {
-	float vref = (float)(VREFINT_voltage * (*VREFINT))/(float)voltageRefint;
-	*vrefScale = vref / (float)VREFINT_voltage;
+	*currentTRIANGLEValue = (uint32_t)abs((int32_t)(2 * currentSAWValue - maxDACAmplitude));
 }
 
+void generateSIN(uint32_t *SINOutput, float_t *currentSINValue, float_t SINIncrement)
+{
+	float_t Amplitude = 100.0; // not 128 because causes clipping
+	*SINOutput = (uint32_t)(Amplitude * (arm_sin_f32(*currentSINValue) + 1.0)); // need to cast to put into HAL_DAC_SetValue function
+	*currentSINValue += SINIncrement;
 
-void delay2K(){
-	for(int32_t i = 0; i<4100;i++);
+	if (*currentSINValue > (2*M_PI))
+	{
+		*currentSINValue = 0.0;
+	}
 }
 
-void delay8K(){
-	for(int32_t i = 0; i<10;i++);
-}
-
-uint32_t temp2frequency(uint32_t frequency){
-	// (5,100) (100,2000)
-	return 44 * frequency - 200;
+void customDelay(int32_t temperatureCelsius)
+{
+	// Ensuring that temperature-based frequency scaling is positive
+	if (temperatureCelsius < 5)
+	{
+		temperatureCelsius = 5;
+	}
+	for (int32_t i = 0; i < temperatureCelsius*100; i++); // for loop use the cpu cycle to create the delays (NOP)
 }

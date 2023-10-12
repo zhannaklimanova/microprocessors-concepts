@@ -21,6 +21,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -30,6 +31,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define ADC_PULLING_RATE (int32_t) 100
 
 /* USER CODE END PD */
 
@@ -61,7 +63,7 @@ static void MX_ADC3_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-#define ITM_Port32(n) (*((volatile unsigned long *) (0xE0000000+4*n)))
+
 /* USER CODE END 0 */
 
 /**
@@ -71,33 +73,32 @@ static void MX_ADC3_Init(void);
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-  uint32_t samplingRate = 20;
-  uint32_t maxDACAmplitude = 200; // send a max of 8-bit number
+  uint32_t samplingRate = 15;
+  uint32_t period = 15; // 15 in ms
+  uint32_t delay = period / samplingRate;
+  uint32_t maxDACAmplitude = 150; // max of 8-bit number (but 200 instead of 256 bc clipping)
   uint32_t DACIncrement = maxDACAmplitude / samplingRate;
-  uint32_t currentDACValue = 0;
+  float_t SINIncrement = (2.0 * M_PI) / samplingRate;
 
-  uint32_t currentTriangle = 0;
-  uint32_t partialSAWTriangle = (2 * maxDACAmplitude) / samplingRate;
-  uint32_t currentSAWTriangle = 0;
+  uint32_t currentSAWValue = 0; // initialized value for SAW signal
+  uint32_t currentTRIANGLEValue = 0; // initialized value for TRIANGLE signal
+  float_t currentSINValue = 0; // initialized value for SIN signal output
+  uint32_t SINOutput = 0;
 
-  float_t sinIncrement = (2.0 * M_PI) / samplingRate;
-  float_t currentSin = 0.0;
-  uint32_t sinOut = 0;
+  uint32_t vrefint;
+  uint32_t temperatureSensor;
+  int32_t temperatureCelcius;
 
-  // final part
-  HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
   GPIO_PinState ledCurrentState = GPIO_PIN_RESET;
   GPIO_PinState buttonCurrentState = GPIO_PIN_SET;
-  uint32_t frequency = 2000;
-  uint32_t frequencyRatio = 1;
 
-  // adc temperature variable
-  float vrefScale;
-  uint32_t vTemp;
-  uint32_t vrefint;
-  float celsiusTemperature;
+  uint32_t currentSignalState = 0;
+  uint32_t currentSignalOutput = 0;
+  enum State {SAW = 0, TRIANGLE = 1, SIN = 2};
+  // 0 = saw
+  // 1 = triangle
+  // 2 = sin
 
-  //  uint8_t readDACValue;
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -126,97 +127,92 @@ int main(void)
   MX_ADC3_Init();
   /* USER CODE BEGIN 2 */
 
-
-
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+  /////////////////////Initialize DAC for Wave/////////////////////
   HAL_DAC_Start(&hdac1, DAC_CHANNEL_1);
   HAL_DAC_Start(&hdac1, DAC_CHANNEL_2);
-
+  /////////////////////Initialize ADC for Temperature Sensor/////////////////////
   HAL_ADC_Start(&hadc1);
-  HAL_ADC_PollForConversion(&hadc1, 200);
+  HAL_ADC_PollForConversion(&hadc1, ADC_PULLING_RATE);
   vrefint = HAL_ADC_GetValue(&hadc1);
+  int32_t vrefintConverted = __HAL_ADC_CALC_VREFANALOG_VOLTAGE(vrefint, ADC_RESOLUTION_12B);
   HAL_ADC_Stop(&hadc1);
-  getVrefRatio(vrefint, &vrefScale);
   while (1)
   {
-
-	  //////////////// part 1 button /////////////
-	  //buttonLightLED();
-	  ////////////////////////////////////
-
-	  //////////////// SAW /////////////
-	  currentDACValue += DACIncrement;
-	  currentDACValue = currentDACValue % maxDACAmplitude;
-	  ////////////////////////////////////
-
-	  ///////////////// TRIANGLE ///////////
-	  currentTriangle = (uint32_t)abs(((int32_t)(currentSAWTriangle - maxDACAmplitude)));
-	  currentSAWTriangle += partialSAWTriangle;
-	  currentSAWTriangle = currentSAWTriangle % (2 * maxDACAmplitude);
-	  //////////////////////////////////////
-
-	  ///////////////// SIN ///////////
-	  sinOut = (uint32_t)(100 * (arm_sin_f32(currentSin) + 1));
-	  currentSin += sinIncrement;
-	  if (currentSin > (2*M_PI)) {
-		  currentSin = 0.0;
-	  }
-	  //////////////////////////////////////
-
-	  ///////////////// dac out part 1///////////
-//	  HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_1, DAC_ALIGN_8B_R, currentTriangle);
- 	  HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_1, DAC_ALIGN_8B_R, currentDACValue);
-	  HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_2, DAC_ALIGN_8B_R, sinOut);
-//	  delay2K();
-	  //////////////////////////////////////
-
-
-	  ////////////////////ADC part 1///////////////////////////////////
-	  HAL_ADC_Start(&hadc3);
-	  HAL_ADC_PollForConversion(&hadc3, 200);
-	  vTemp = HAL_ADC_GetValue(&hadc3);
-	  HAL_ADC_Stop(&hadc3);
-
-	  convertV2C(vTemp, &vrefScale, &celsiusTemperature);
-	  /////////////////////////////////////////////////////////
-
-	  ////////////////////temperature scaling 1///////////////////////////////////
-	  frequency = temp2frequency((uint32_t) celsiusTemperature);
-
-	  if(ledCurrentState == GPIO_PIN_SET){
-		  frequencyRatio = 2000 / frequency;
-	  } else {
-		  frequencyRatio = 1;
-	  }
-
-	  for(uint32_t i=0;i<frequencyRatio;i++){
-		  delay8K();
-	  }
-	  /////////////////////////////////////////////////////////
-
-	  ////////////////////state change control///////////////////////////////////
-	  GPIO_PinState buttonRead = HAL_GPIO_ReadPin(BLUE_BUTTON_GPIO_Port, BLUE_BUTTON_Pin);
-	  if(buttonRead == GPIO_PIN_SET && buttonCurrentState != buttonRead){
-		  if(ledCurrentState == GPIO_PIN_RESET){
-			  ledCurrentState = GPIO_PIN_SET;
-		  } else {
-			  ledCurrentState = GPIO_PIN_RESET;
-		  }
-		  HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, ledCurrentState);
-	  }
-	  buttonCurrentState = buttonRead;
-	  /////////////////////////////////////////////////////////
-
-
-
-
-
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+//	  buttonLightLED();
+
+	  // This should be running for all parts because they depend on the signal values
+	  generateSAW(&currentSAWValue, DACIncrement, maxDACAmplitude);
+	  generateTRIANGLE(&currentTRIANGLEValue, currentSAWValue, maxDACAmplitude);
+	  generateSIN(&SINOutput, &currentSINValue, SINIncrement);
+
+	  // DAC for all parts except the last with the button
+//	  HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_1, DAC_ALIGN_8B_R, currentSAWValue); // took DAC_ALIGN_8B_R from documentation
+//	  HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_2, DAC_ALIGN_8B_R, currentTRIANGLEValue);
+//	  HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_2, DAC_ALIGN_8B_R, SINOutput);
+
+	  ///// ADC temp read /////
+	  HAL_ADC_Start(&hadc3);
+	  HAL_ADC_PollForConversion(&hadc3, ADC_PULLING_RATE); // code to poll each ADC every 100 milliseconds
+	  temperatureSensor = HAL_ADC_GetValue(&hadc3); // hadc3 because ADC3
+	  HAL_ADC_Stop(&hadc3);
+	  temperatureCelcius = __HAL_ADC_CALC_TEMPERATURE(vrefintConverted , temperatureSensor, ADC_RESOLUTION_12B);
+
+
+	  // Delay for temperature change - frequency goes down when temperature goes up
+//	  customDelay(temperatureCelcius);
+
+	  // Delay for waves (don't forget to remove this when using temperature!
+//	  HAL_Delay(delay);
+
+
+      GPIO_PinState buttonRead = HAL_GPIO_ReadPin(BLUE_BUTTON_GPIO_Port, BLUE_BUTTON_Pin);
+      if (buttonCurrentState != buttonRead && buttonRead == GPIO_PIN_RESET) // if there's a change of state (button pressed/released) AND we only want when button is first pressed
+      {
+          if (ledCurrentState == GPIO_PIN_RESET) // LED Off
+          {
+              ledCurrentState = GPIO_PIN_SET;
+              currentSignalState += 1;
+              currentSignalState = currentSignalState % 3; // 3 state 0, 1, 2
+          }
+          else // LED On
+          {
+              ledCurrentState = GPIO_PIN_RESET;
+          }
+          HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, ledCurrentState);
+      }
+      buttonCurrentState = buttonRead;
+
+      // Change the signal depending on button press
+      if (ledCurrentState == GPIO_PIN_RESET)
+      { // LED Off
+    	  switch(currentSignalState)
+    	  {
+    	  	  case SAW:
+    	  		  currentSignalOutput = currentSAWValue;
+    	  		  break;
+    	  	  case TRIANGLE:
+    	  		currentSignalOutput = currentTRIANGLEValue;
+    	  		break;
+    	  	  case SIN:
+      	  		currentSignalOutput = SINOutput;
+      	  		break;
+    	  }
+    	  HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_1, DAC_ALIGN_8B_R, currentSignalOutput);
+    	  HAL_Delay(delay);
+      }
+      else
+      { // LED On
+    	  HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_1, DAC_ALIGN_8B_R, SINOutput);
+    	  customDelay(temperatureCelcius);
+      }
+
   }
   /* USER CODE END 3 */
 }
@@ -349,7 +345,7 @@ static void MX_ADC1_Init(void)
   */
   sConfig.Channel = ADC_CHANNEL_VREFINT;
   sConfig.Rank = ADC_REGULAR_RANK_1;
-  sConfig.SamplingTime = ADC_SAMPLETIME_640CYCLES_5;
+  sConfig.SamplingTime = ADC_SAMPLETIME_92CYCLES_5;
   sConfig.SingleDiff = ADC_SINGLE_ENDED;
   sConfig.OffsetNumber = ADC_OFFSET_NONE;
   sConfig.Offset = 0;
@@ -407,7 +403,7 @@ static void MX_ADC3_Init(void)
   */
   sConfig.Channel = ADC_CHANNEL_TEMPSENSOR;
   sConfig.Rank = ADC_REGULAR_RANK_1;
-  sConfig.SamplingTime = ADC_SAMPLETIME_640CYCLES_5;
+  sConfig.SamplingTime = ADC_SAMPLETIME_92CYCLES_5;
   sConfig.SingleDiff = ADC_SINGLE_ENDED;
   sConfig.OffsetNumber = ADC_OFFSET_NONE;
   sConfig.Offset = 0;

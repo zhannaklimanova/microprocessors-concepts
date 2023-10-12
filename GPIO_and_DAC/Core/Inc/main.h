@@ -31,11 +31,9 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#define ARM_MATH_CM4
-#include "arm_math.h"
 #include "custom_functions.h"
-#include <stdlib.h>
-#include <math.h>
+//#include "stm32l4xx_hal_adc.h"
+
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
@@ -71,6 +69,7 @@ void Error_Handler(void);
 #define SWO_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
+#define ARM_MATH_CM4
 
 /* USER CODE END Private defines */
 
