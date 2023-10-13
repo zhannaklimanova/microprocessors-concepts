@@ -36,11 +36,22 @@
 #define maxSinShiftedAmplitude 2
 
 // Frequency Constants
-#define TIM2Frequency 44100
+#define TIM2Frequency 44100.0
 
-#define C7 2093
+#define C7 2093.0
+#define B6 1975.53
+#define Ab6 1661.22
+#define G6 1567.98
+#define E6 1318.51
+#define Eb6 1244.51
+
 // How many times to trigger TIM2 before we send new sample
-#define C7Polling TIM2Frequency/2093/numSamples // slight shift in sampling - not exact but close enough
+#define C7Polling TIM2Frequency/C7/numSamples // slight shift in sampling - not exact but close enough
+#define B6Polling TIM2Frequency/B6/numSamples
+#define Ab6Polling TIM2Frequency/Ab6/numSamples
+#define G6Polling TIM2Frequency/G6/numSamples
+#define E6Polling TIM2Frequency/E6/numSamples
+#define Eb6Polling TIM2Frequency/Eb6/numSamples
 
 /* USER CODE END PD */
 
@@ -56,8 +67,21 @@ TIM_HandleTypeDef htim2;
 
 /* USER CODE BEGIN PV */
 uint32_t sinArray[numSamples];
-uint32_t counterC7 = 0;
+float32_t noteCounter = 0;
 uint32_t sampleCounter = 0;
+uint32_t switchNoteCounter = 0;
+enum Note
+{
+	noteC7 = 0,
+	noteB6 = 1,
+	noteAb6 = 2,
+	noteG6 = 3,
+	noteE6 = 4,
+	noteEb6 = 5,
+	numNotes = 6
+};
+
+enum Note currentNote = noteC7;
 
 /* USER CODE END PV */
 
@@ -323,6 +347,8 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 	if (GPIO_Pin == BLUE_BUTTON_Pin)
 	{
 		HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+		currentNote++;
+		currentNote = currentNote % numNotes;
 	}
 
 }
@@ -335,14 +361,41 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 	// Making sure that interrupt was caused by TIM2
 	if (htim == &htim2) // comparing pointers has same effect as comparing values
 	{
-		counterC7++;
-		counterC7 = counterC7 % C7Polling;
-		if (counterC7 == 0)
+		noteCounter++;
+		uint32_t increment = 0;
+		float32_t notePolling = 0;
+		switch(currentNote)
 		{
-			sampleCounter++;
-			sampleCounter = sampleCounter % numSamples;
-			HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_1, DAC_ALIGN_8B_R, sinArray[sampleCounter]);
+			case noteC7:
+				notePolling = C7Polling;
+				break;
+			case noteB6:
+				notePolling = B6Polling;
+				break;
+			case noteAb6:
+				notePolling = Ab6Polling;
+				break;
+			case noteG6:
+				notePolling = G6Polling;
+				break;
+			case noteE6:
+				notePolling = E6Polling;
+				break;
+			case noteEb6:
+				notePolling = Eb6Polling;
+				break;
+			default:
+				break;
 		}
+
+		while (noteCounter > notePolling)
+		{
+			noteCounter -= notePolling;
+			increment++;
+		}
+		sampleCounter += increment;
+		sampleCounter = sampleCounter % numSamples;
+		HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_1, DAC_ALIGN_8B_R, sinArray[sampleCounter]);
 	}
 }
 /* USER CODE END 4 */
