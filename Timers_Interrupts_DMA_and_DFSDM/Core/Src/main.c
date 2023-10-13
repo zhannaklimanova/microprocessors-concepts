@@ -64,6 +64,7 @@
 
 /* Private variables ---------------------------------------------------------*/
 DAC_HandleTypeDef hdac1;
+DMA_HandleTypeDef hdma_dac_ch1;
 
 TIM_HandleTypeDef htim2;
 
@@ -91,6 +92,7 @@ uint32_t nextNoteCounter = 0;
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
+static void MX_DMA_Init(void);
 static void MX_DAC1_Init(void);
 static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
@@ -130,6 +132,7 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_DAC1_Init();
   MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
@@ -149,8 +152,11 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   /////////////////////Initializing/////////////////////
-  HAL_DAC_Start(&hdac1, DAC_CHANNEL_1);
-  HAL_TIM_Base_Start_IT(&htim2);
+//  HAL_DAC_Start(&hdac1, DAC_CHANNEL_1);
+//  HAL_TIM_Base_Start_IT(&htim2);
+
+  HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1, (uint32_t*)sinArray, (uint32_t)numSamples, DAC_ALIGN_8B_R);
+  HAL_TIM_Base_Start(&htim2);
   while (1)
   {
     /* USER CODE END WHILE */
@@ -240,7 +246,7 @@ static void MX_DAC1_Init(void)
   /** DAC channel OUT1 config
   */
   sConfig.DAC_SampleAndHold = DAC_SAMPLEANDHOLD_DISABLE;
-  sConfig.DAC_Trigger = DAC_TRIGGER_NONE;
+  sConfig.DAC_Trigger = DAC_TRIGGER_T2_TRGO;
   sConfig.DAC_OutputBuffer = DAC_OUTPUTBUFFER_ENABLE;
   sConfig.DAC_ConnectOnChipPeripheral = DAC_CHIPCONNECT_DISABLE;
   sConfig.DAC_UserTrimming = DAC_TRIMMING_FACTORY;
@@ -296,6 +302,22 @@ static void MX_TIM2_Init(void)
   /* USER CODE BEGIN TIM2_Init 2 */
 
   /* USER CODE END TIM2_Init 2 */
+
+}
+
+/**
+  * Enable DMA controller clock
+  */
+static void MX_DMA_Init(void)
+{
+
+  /* DMA controller clock enable */
+  __HAL_RCC_DMA1_CLK_ENABLE();
+
+  /* DMA interrupt init */
+  /* DMA1_Channel3_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Channel3_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Channel3_IRQn);
 
 }
 
