@@ -36,7 +36,7 @@
 #define maxSinShiftedAmplitude 2
 
 // Frequency Constants
-#define TIM2Frequency 44100.0
+#define TIM2Frequency 44100
 
 #define C7 2093.0
 #define B6 1975.53
@@ -44,6 +44,7 @@
 #define G6 1567.98
 #define E6 1318.51
 #define Eb6 1244.51
+#define noteChangeFrequency 1 // how long you wait before next note
 
 // How many times to trigger TIM2 before we send new sample
 #define C7Polling TIM2Frequency/C7/numSamples // slight shift in sampling - not exact but close enough
@@ -52,6 +53,7 @@
 #define G6Polling TIM2Frequency/G6/numSamples
 #define E6Polling TIM2Frequency/E6/numSamples
 #define Eb6Polling TIM2Frequency/Eb6/numSamples
+#define noteChangePolling TIM2Frequency/noteChangeFrequency
 
 /* USER CODE END PD */
 
@@ -81,7 +83,8 @@ enum Note
 	numNotes = 6
 };
 
-enum Note currentNote = noteC7;
+enum Note currentNote = numNotes;
+uint32_t nextNoteCounter = 0;
 
 /* USER CODE END PV */
 
@@ -347,8 +350,10 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 	if (GPIO_Pin == BLUE_BUTTON_Pin)
 	{
 		HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
-		currentNote++;
-		currentNote = currentNote % numNotes;
+		currentNote = noteC7;
+		noteCounter = 0;
+		nextNoteCounter = 0;
+
 	}
 
 }
@@ -361,8 +366,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 	// Making sure that interrupt was caused by TIM2
 	if (htim == &htim2) // comparing pointers has same effect as comparing values
 	{
-		noteCounter++;
-		uint32_t increment = 0;
+
+		// choose the note that will be used for the frequency
 		float32_t notePolling = 0;
 		switch(currentNote)
 		{
@@ -388,14 +393,30 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 				break;
 		}
 
-		while (noteCounter > notePolling)
+		// get the next sample for the current note
+		noteCounter++;
+		uint32_t increment = 0;
+		while (currentNote != numNotes && noteCounter > notePolling)
 		{
 			noteCounter -= notePolling;
 			increment++;
 		}
 		sampleCounter += increment;
 		sampleCounter = sampleCounter % numSamples;
-		HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_1, DAC_ALIGN_8B_R, sinArray[sampleCounter]);
+
+		// change the current note depending on the time
+		nextNoteCounter++;
+		if(currentNote != numNotes && nextNoteCounter == noteChangePolling){
+			currentNote++;
+			nextNoteCounter = 0;
+		}
+
+		// output current note to dac
+		uint32_t dacOut = 0;
+		if(currentNote != numNotes){
+			dacOut= sinArray[sampleCounter];
+		}
+		HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_1, DAC_ALIGN_8B_R, dacOut);
 	}
 }
 /* USER CODE END 4 */
