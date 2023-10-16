@@ -56,6 +56,8 @@
 #define Eb6Polling TIM2Frequency/Eb6/numSamples
 #define noteChangePolling TIM2Frequency/noteChangeFrequency
 
+////////////////PART 4////////////////////
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -72,12 +74,17 @@ DFSDM_Channel_HandleTypeDef hdfsdm1_channel2;
 DMA_HandleTypeDef hdma_dfsdm1_flt0;
 
 TIM_HandleTypeDef htim2;
+TIM_HandleTypeDef htim3;
 
 /* USER CODE BEGIN PV */
 uint32_t sinArray[numSamples];
 float32_t noteCounter = 0;
 uint32_t sampleCounter = 0;
 uint32_t switchNoteCounter = 0;
+
+////////////////PART 4////////////////////
+uint32_t blinkingMaxCounter = TIM2Frequency / 2; // 2 Hz frequency will mean blinking every 0.5 second
+uint32_t blinkingCounter = 0;
 
 // crap code
 int32_t RecBuff[AUDIO_BUFF];
@@ -96,7 +103,16 @@ enum Note
 	numNotes = 6
 };
 
+enum LED
+{
+	OFF = 0,
+	BLINKING = 1,
+	ON = 2
+};
+
 enum Note currentNote = numNotes;
+enum LED stateLED = OFF;
+
 uint32_t nextNoteCounter = 0;
 
 /* USER CODE END PV */
@@ -108,6 +124,7 @@ static void MX_DMA_Init(void);
 static void MX_DAC1_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_DFSDM1_Init(void);
+static void MX_TIM3_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -149,6 +166,7 @@ int main(void)
   MX_DAC1_Init();
   MX_TIM2_Init();
   MX_DFSDM1_Init();
+  MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
   float32_t sinValue = 0;
   // Creating samples for sine wave
@@ -169,31 +187,32 @@ int main(void)
 //  HAL_DAC_Start(&hdac1, DAC_CHANNEL_1);
 //  HAL_TIM_Base_Start_IT(&htim2);
 
-	HAL_DFSDM_FilterRegularStart_DMA(&hdfsdm1_filter0, (int32_t*)RecBuff, (uint32_t)AUDIO_BUFF);
-	HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1, (uint32_t*)PlayBuff, (uint32_t)AUDIO_BUFF, DAC_ALIGN_8B_R);
+//  HAL_DFSDM_FilterRegularStart_DMA(&hdfsdm1_filter0, (int32_t*)RecBuff, (uint32_t)AUDIO_BUFF);
+//  HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1, (uint32_t*)PlayBuff, (uint32_t)AUDIO_BUFF, DAC_ALIGN_8B_R);
+//
+//
+//  HAL_Delay(500);
 
 
-  HAL_Delay(500);
-
-
-  HAL_TIM_Base_Start(&htim2);
+//  HAL_TIM_Base_Start_IT(&htim2);
+  HAL_TIM_Base_Start_IT(&htim3);
   while (1)
   {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  if(DmaRecHalfBuffCplt == 1) {
-		  for(uint32_t i = 0; i<AUDIO_BUFF/2;i++) {
-			  PlayBuff[i] = (RecBuff[i] >> 8)*170/16777216;
-		  }
-		  DmaRecHalfBuffCplt = 0;
-	  }
-	  if(DmaRecBuffCplt == 1) {
-		  for(uint32_t i = 0; i<AUDIO_BUFF;i++) {
-			  PlayBuff[i] = (((uint32_t)RecBuff[i]) >> 8)*170/16777216;
-		  }
-		  DmaRecBuffCplt = 0;
-	  }
+//	  if(DmaRecHalfBuffCplt == 1) {
+//		  for(uint32_t i = 0; i<AUDIO_BUFF/2;i++) {
+//			  PlayBuff[i] = (RecBuff[i] >> 8)*170/16777216;
+//		  }
+//		  DmaRecHalfBuffCplt = 0;
+//	  }
+//	  if(DmaRecBuffCplt == 1) {
+//		  for(uint32_t i = 0; i<AUDIO_BUFF;i++) {
+//			  PlayBuff[i] = (((uint32_t)RecBuff[i]) >> 8)*170/16777216;
+//		  }
+//		  DmaRecBuffCplt = 0;
+//	  }
   }
   /* USER CODE END 3 */
 }
@@ -277,7 +296,7 @@ static void MX_DAC1_Init(void)
   /** DAC channel OUT1 config
   */
   sConfig.DAC_SampleAndHold = DAC_SAMPLEANDHOLD_DISABLE;
-  sConfig.DAC_Trigger = DAC_TRIGGER_T2_TRGO;
+  sConfig.DAC_Trigger = DAC_TRIGGER_NONE;
   sConfig.DAC_OutputBuffer = DAC_OUTPUTBUFFER_ENABLE;
   sConfig.DAC_ConnectOnChipPeripheral = DAC_CHIPCONNECT_DISABLE;
   sConfig.DAC_UserTrimming = DAC_TRIMMING_FACTORY;
@@ -310,7 +329,7 @@ static void MX_DFSDM1_Init(void)
   hdfsdm1_filter0.Init.RegularParam.Trigger = DFSDM_FILTER_SW_TRIGGER;
   hdfsdm1_filter0.Init.RegularParam.FastMode = ENABLE;
   hdfsdm1_filter0.Init.RegularParam.DmaMode = ENABLE;
-  hdfsdm1_filter0.Init.FilterParam.SincOrder = DFSDM_FILTER_FASTSINC_ORDER;
+  hdfsdm1_filter0.Init.FilterParam.SincOrder = DFSDM_FILTER_SINC3_ORDER;
   hdfsdm1_filter0.Init.FilterParam.Oversampling = 250;
   hdfsdm1_filter0.Init.FilterParam.IntOversampling = 1;
   if (HAL_DFSDM_FilterInit(&hdfsdm1_filter0) != HAL_OK)
@@ -363,7 +382,7 @@ static void MX_TIM2_Init(void)
 
   /* USER CODE END TIM2_Init 1 */
   htim2.Instance = TIM2;
-  htim2.Init.Prescaler = 0;
+  htim2.Init.Prescaler = 1;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
   htim2.Init.Period = 1814;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
@@ -386,6 +405,51 @@ static void MX_TIM2_Init(void)
   /* USER CODE BEGIN TIM2_Init 2 */
 
   /* USER CODE END TIM2_Init 2 */
+
+}
+
+/**
+  * @brief TIM3 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM3_Init(void)
+{
+
+  /* USER CODE BEGIN TIM3_Init 0 */
+
+  /* USER CODE END TIM3_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM3_Init 1 */
+
+  /* USER CODE END TIM3_Init 1 */
+  htim3.Instance = TIM3;
+  htim3.Init.Prescaler = 40000;
+  htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim3.Init.Period = 1000;
+  htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim3, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM3_Init 2 */
+
+  /* USER CODE END TIM3_Init 2 */
 
 }
 
@@ -451,7 +515,7 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 /**
- * @overwrite
+ * @overwriteGPIO_PIN_RESET
  * @brief interrupt service routine for GPIO
  */
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
@@ -459,10 +523,18 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 	// Making sure the interrupt was caused by the PC13
 	if (GPIO_Pin == BLUE_BUTTON_Pin)
 	{
-		HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
-		currentNote = noteC7;
-		noteCounter = 0;
-		nextNoteCounter = 0;
+		switch(stateLED)
+		{
+			case OFF:
+				stateLED = BLINKING;
+				break;
+			case BLINKING:
+				stateLED = ON;
+				break;
+			case ON:
+				stateLED = OFF;
+				break;
+		}
 
 	}
 
@@ -473,72 +545,36 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
  * @brief interrupt service routine for timers
  */
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
+
 	// Making sure that interrupt was caused by TIM2
-	if (htim == &htim2) // comparing pointers has same effect as comparing values
+
+
+	if (htim == &htim3) // ISR for TIM3
 	{
-
-		// choose the note that will be used for the frequency
-		float32_t notePolling = 0;
-		switch(currentNote)
+		switch(stateLED)
 		{
-			case noteC7:
-				notePolling = C7Polling;
+			case OFF:
+				HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
 				break;
-			case noteB6:
-				notePolling = B6Polling;
+			case BLINKING:
+				HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
 				break;
-			case noteAb6:
-				notePolling = Ab6Polling;
-				break;
-			case noteG6:
-				notePolling = G6Polling;
-				break;
-			case noteE6:
-				notePolling = E6Polling;
-				break;
-			case noteEb6:
-				notePolling = Eb6Polling;
-				break;
-			default:
+			case ON:
+				HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_SET);
 				break;
 		}
-
-		// get the next sample for the current note
-		noteCounter++;
-		uint32_t increment = 0;
-		while (currentNote != numNotes && noteCounter > notePolling)
-		{
-			noteCounter -= notePolling;
-			increment++;
-		}
-		sampleCounter += increment;
-		sampleCounter = sampleCounter % numSamples;
-
-		// change the current note depending on the time
-		nextNoteCounter++;
-		if(currentNote != numNotes && nextNoteCounter == noteChangePolling){
-			currentNote++;
-			nextNoteCounter = 0;
-		}
-
-		// output current note to dac
-		uint32_t dacOut = 0;
-		if(currentNote != numNotes){
-			dacOut= sinArray[sampleCounter];
-		}
-		HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_1, DAC_ALIGN_8B_R, dacOut);
 	}
 }
 
 
-
-void HAL_DFSDM_FilterRegConvHalfCpltCallback (DFSDM_Filter_HandleTypeDef * hdfsdm_filter) {
-	DmaRecHalfBuffCplt = 1;
-}
-
-void HAL_DFSDM_FilterRegConvCpltCallback (DFSDM_Filter_HandleTypeDef * hdfsdm_filter){
-	DmaRecBuffCplt = 1;
-}
+//
+//void HAL_DFSDM_FilterRegConvHalfCpltCallback (DFSDM_Filter_HandleTypeDef * hdfsdm_filter) {
+//	DmaRecHalfBuffCplt = 1;
+//}
+//
+//void HAL_DFSDM_FilterRegConvCpltCallback (DFSDM_Filter_HandleTypeDef * hdfsdm_filter){
+//	DmaRecBuffCplt = 1;
+//}
 
 
 
