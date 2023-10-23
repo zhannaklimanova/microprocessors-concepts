@@ -64,23 +64,11 @@ DMA_HandleTypeDef hdma_dfsdm1_flt0;
 
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
-TIM_HandleTypeDef htim4;
 
 /* USER CODE BEGIN PV */
+uint32_t systemClkFrequency;
 uint32_t sinArray[NUM_SAMPLES];
-
-////////////////PART 4////////////////////
 int32_t audioBuffer[AUDIO_BUFFER_SIZE];
-
-enum Notes
-{
-	noteC7,
-	noteB6,
-	noteAb6,
-	noteG6,
-	noteE6,
-	noteEb6
-};
 
 enum LED
 {
@@ -94,24 +82,14 @@ enum ProgramStates
 	WAIT_FOR_RECORDING,
 	RECORDING,
 	POST_PROCESSING,
-	WAIT_FOR_PLAYBACK,
-	PLAY_NOTES,
+	DONE_RECORDING,
 	PLAYBACK
 };
 
-enum Notes currentNote;
 enum LED stateLED = OFF;
 enum ProgramStates programState = WAIT_FOR_RECORDING;
 
-uint32_t prescalerC7;
-uint32_t prescalerB6;
-uint32_t prescalerAb6;
-uint32_t prescalerG6;
-uint32_t prescalerE6;
-uint32_t prescalerEb6;
-uint32_t prescalerMicrophone; // polling frequency of our microphone
 
-uint32_t systemClkFrequency;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -122,7 +100,6 @@ static void MX_DAC1_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_DFSDM1_Init(void);
 static void MX_TIM3_Init(void);
-static void MX_TIM4_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -165,28 +142,7 @@ int main(void)
   MX_TIM2_Init();
   MX_DFSDM1_Init();
   MX_TIM3_Init();
-  MX_TIM4_Init();
   /* USER CODE BEGIN 2 */
-  float32_t sinValue = 0;
-  // Creating samples for sine wave
-  for (uint32_t sample=0; sample<NUM_SAMPLES; sample++)
-  {
-	  sinValue = arm_sin_f32(2*PI/NUM_SAMPLES*sample);
-	  sinValue += 1.0; // shift function into positive x (range of sin function is 2)
-	   // Using 8 bit so 256 DAC (don't want to go over 2/3 of DAC because it creates clipping so use 170)
-	  // We have sin function amplitude of 2 maximum and we want to scale it to be over 170 bit
-	  sinValue = sinValue / MAX_SIN_SHIFTED_AMPLITUDE * MAX_DAC;
-	  sinArray[sample] = (uint32_t)sinValue;
-  }
-  // Calculate prescaler values
-  systemClkFrequency = HAL_RCC_GetSysClockFreq();
-  prescalerC7 = systemClkFrequency / ((htim2.Instance->ARR) * C7 * NUM_SAMPLES);
-  prescalerB6 = systemClkFrequency / ((htim2.Instance->ARR) * B6 * NUM_SAMPLES);
-  prescalerAb6 = systemClkFrequency / ((htim2.Instance->ARR) * Ab6 * NUM_SAMPLES);
-  prescalerG6 = systemClkFrequency / ((htim2.Instance->ARR) * G6 * NUM_SAMPLES);
-  prescalerE6 = systemClkFrequency / ((htim2.Instance->ARR) * E6 * NUM_SAMPLES);
-  prescalerEb6 = systemClkFrequency / ((htim2.Instance->ARR) * Eb6 * NUM_SAMPLES);
-  prescalerMicrophone = htim2.Instance->PSC;
 
   /* USER CODE END 2 */
 
@@ -201,16 +157,17 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 	 //////////////// programState = POST_PROCESSING ////////////////
-	 if (programState == POST_PROCESSING)
-	 {
-		 for (uint32_t i=0; i<AUDIO_BUFFER_SIZE; i++)
-		 {
+	if (programState == POST_PROCESSING)
+	{
+		for (uint32_t i=0; i<AUDIO_BUFFER_SIZE; i++)
+		{
 			audioBuffer[i] = (uint32_t)audioBuffer[i] >> 8; // remove channel information from 24-bit DFSDM output
 			audioBuffer[i] = audioBuffer[i] * MAX_DAC; // scale value from microphone to the scale DAC can output
 			audioBuffer[i] = (uint32_t)audioBuffer[i] >> 24; // its like dividing by 2^24
-		 }
-		 programState = WAIT_FOR_PLAYBACK;
-		 stateLED = OFF;
+		}
+		programState = PLAYBACK;
+		stateLED = ON;
+		HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1, (uint32_t*)audioBuffer, (uint32_t)AUDIO_BUFFER_SIZE, DAC_ALIGN_8B_R);
 	 }
   }
   /* USER CODE END 3 */
@@ -452,51 +409,6 @@ static void MX_TIM3_Init(void)
 }
 
 /**
-  * @brief TIM4 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_TIM4_Init(void)
-{
-
-  /* USER CODE BEGIN TIM4_Init 0 */
-
-  /* USER CODE END TIM4_Init 0 */
-
-  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
-  TIM_MasterConfigTypeDef sMasterConfig = {0};
-
-  /* USER CODE BEGIN TIM4_Init 1 */
-
-  /* USER CODE END TIM4_Init 1 */
-  htim4.Instance = TIM4;
-  htim4.Init.Prescaler = 40000;
-  htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim4.Init.Period = 1000;
-  htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-  if (HAL_TIM_Base_Init(&htim4) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
-  if (HAL_TIM_ConfigClockSource(&htim4, &sClockSourceConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
-  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-  if (HAL_TIMEx_MasterConfigSynchronization(&htim4, &sMasterConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN TIM4_Init 2 */
-
-  /* USER CODE END TIM4_Init 2 */
-
-}
-
-/**
   * Enable DMA controller clock
   */
 static void MX_DMA_Init(void)
@@ -568,25 +480,17 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 	{
 		switch(programState)
 		{
-			case PLAY_NOTES:
-				HAL_TIM_Base_Stop_IT(&htim4);
-				HAL_TIM_Base_DeInit(&htim4); // de-initialize the timer so that if its interrupted, its reset
-			case PLAYBACK:
-				HAL_DAC_Stop_DMA(&hdac1, DAC_CHANNEL_1);
 			case WAIT_FOR_RECORDING:
 				programState = RECORDING;
 				stateLED = BLINKING;
 				// DAC_CH1 should be set to Normal so that DAC is stopped when its finished READING the recording buffer
 				HAL_DFSDM_FilterRegularStart_DMA(&hdfsdm1_filter0, (int32_t*)audioBuffer, (uint32_t)AUDIO_BUFFER_SIZE);
 				break;
-			case WAIT_FOR_PLAYBACK:
-				programState = PLAY_NOTES;
-				stateLED = ON;
-				currentNote = noteC7;
-				htim2.Instance->PSC = prescalerC7;
-				HAL_TIM_Base_Init(&htim4);
-				HAL_TIM_Base_Start_IT(&htim4);
-				HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1, (uint32_t*)sinArray, (uint32_t)NUM_SAMPLES, DAC_ALIGN_8B_R);
+			case PLAYBACK:
+				HAL_DAC_Stop_DMA(&hdac1, DAC_CHANNEL_1);
+				programState = RECORDING;
+				stateLED = BLINKING;
+				HAL_DFSDM_FilterRegularStart_DMA(&hdfsdm1_filter0, (int32_t*)audioBuffer, (uint32_t)AUDIO_BUFFER_SIZE);;
 				break;
 			default:
 				break;
@@ -619,57 +523,12 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 				break;
 		}
 	}
-	else if (htim == &htim4)
-	{
-		switch(currentNote)
-		{
-			case noteC7:
-				currentNote = noteB6;
-				htim2.Instance->PSC = prescalerB6;
-				break;
-			case noteB6:
-				currentNote = noteAb6;
-				htim2.Instance->PSC = prescalerAb6;
-				break;
-			case noteAb6:
-				currentNote = noteG6;
-				htim2.Instance->PSC = prescalerG6;
-				break;
-			case noteG6:
-				currentNote = noteE6;
-				htim2.Instance->PSC = prescalerE6;
-				break;
-			case noteE6:
-				currentNote = noteEb6;
-				htim2.Instance->PSC = prescalerEb6;
-				break;
-			case noteEb6:
-				htim2.Instance->PSC = prescalerMicrophone;
-				HAL_DAC_Stop_DMA(&hdac1, DAC_CHANNEL_1);
-				HAL_TIM_Base_Stop_IT(&htim4);
-				// DFSDM_FLT0 should be set to Normal so that DFSDM is stopped when its finished WRITING the recording buffer
-				HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1, (uint32_t*)audioBuffer, (uint32_t)AUDIO_BUFFER_SIZE, DAC_ALIGN_8B_R);
-				programState = PLAYBACK; // stateLED = ON;
-				break;
-		}
-	}
-}
-
-void HAL_DAC_ConvCpltCallbackCh1(DAC_HandleTypeDef *hdac)
-{
-	// SOFTWARE INTERRUPTS SHOULD BE AS SHORT AS POSSIBLE!!!!!!!!!!!!!
-	if (programState == PLAYBACK)
-	{
-		HAL_DAC_Stop_DMA(&hdac1, DAC_CHANNEL_1);
-		programState = WAIT_FOR_RECORDING; // when finished playback the ISR is done and so go to new state
-		stateLED = OFF;
-	}
 }
 
 void HAL_DFSDM_FilterRegConvCpltCallback(DFSDM_Filter_HandleTypeDef *hdfsdm_filter)
 {
 	// SOFTWARE INTERRUPTS SHOULD BE AS SHORT AS POSSIBLE!!!!!!!!!!!!!
-	// ISR for filling buffer during recording
+	// ISR for filling buffer during recording - HOW WE ARE NOTIFIED BUFFER IS FULL
 	/*
 	 * Instead of doing post-processing in the interrupt we have a flag to do it in main program.
 	 * ISR should be as short as possible so as to not stall the other ISR's in the program. By having a
