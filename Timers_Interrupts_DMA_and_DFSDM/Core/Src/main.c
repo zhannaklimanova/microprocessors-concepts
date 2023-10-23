@@ -35,7 +35,6 @@
 #define MAX_DAC 170
 #define MAX_SIN_SHIFTED_AMPLITUDE 2
 #define AUDIO_BUFFER_SIZE 24000
-#define INTERNAL_CLK_FREQUENCY 80000000
 
 // Frequency Constants
 #define C7 2093
