@@ -31,32 +31,6 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define numSamples 16
-#define maxDAC 170
-#define maxSinShiftedAmplitude 2
-#define AUDIO_BUFF 1024
-
-// Frequency Constants
-#define TIM2Frequency 44100
-
-#define C7 2093.0
-#define B6 1975.53
-#define Ab6 1661.22
-#define G6 1567.98
-#define E6 1318.51
-#define Eb6 1244.51
-#define noteChangeFrequency 1 // how long you wait before next note
-
-// How many times to trigger TIM2 before we send new sample
-#define C7Polling TIM2Frequency/C7/numSamples // slight shift in sampling - not exact but close enough
-#define B6Polling TIM2Frequency/B6/numSamples
-#define Ab6Polling TIM2Frequency/Ab6/numSamples
-#define G6Polling TIM2Frequency/G6/numSamples
-#define E6Polling TIM2Frequency/E6/numSamples
-#define Eb6Polling TIM2Frequency/Eb6/numSamples
-#define noteChangePolling TIM2Frequency/noteChangeFrequency
-
-////////////////PART 4////////////////////
 
 /* USER CODE END PD */
 
@@ -77,43 +51,6 @@ TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
 
 /* USER CODE BEGIN PV */
-uint32_t sinArray[numSamples];
-float32_t noteCounter = 0;
-uint32_t sampleCounter = 0;
-uint32_t switchNoteCounter = 0;
-
-////////////////PART 4////////////////////
-uint32_t blinkingMaxCounter = TIM2Frequency / 2; // 2 Hz frequency will mean blinking every 0.5 second
-uint32_t blinkingCounter = 0;
-
-// crap code
-int32_t RecBuff[AUDIO_BUFF];
-int32_t PlayBuff[AUDIO_BUFF];
-uint32_t DmaRecHalfBuffCplt = 0;
-uint32_t DmaRecBuffCplt = 0;
-
-enum Note
-{
-	noteC7 = 0,
-	noteB6 = 1,
-	noteAb6 = 2,
-	noteG6 = 3,
-	noteE6 = 4,
-	noteEb6 = 5,
-	numNotes = 6
-};
-
-enum LED
-{
-	OFF = 0,
-	BLINKING = 1,
-	ON = 2
-};
-
-enum Note currentNote = numNotes;
-enum LED stateLED = OFF;
-
-uint32_t nextNoteCounter = 0;
 
 /* USER CODE END PV */
 
@@ -168,51 +105,19 @@ int main(void)
   MX_DFSDM1_Init();
   MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
-  float32_t sinValue = 0;
-  // Creating samples for sine wave
-  for (uint32_t sample=0; sample<numSamples; sample++)
-  {
-	  sinValue = arm_sin_f32(2*PI/numSamples*sample);
-	  sinValue += 1.0; // shift function into positive x (range of sin function is 2)
-	   // Using 8 bit so 256 DAC (don't want to go over 2/3 of DAC because it creates clipping so use 170)
-	  // We have sin function amplitude of 2 maximum and we want to scale it to be over 170 bit
-	  sinValue = sinValue / maxSinShiftedAmplitude * maxDAC;
-	  sinArray[sample] = (uint32_t)sinValue;
-  }
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  /////////////////////Initializing/////////////////////
-//  HAL_DAC_Start(&hdac1, DAC_CHANNEL_1);
-//  HAL_TIM_Base_Start_IT(&htim2);
 
-//  HAL_DFSDM_FilterRegularStart_DMA(&hdfsdm1_filter0, (int32_t*)RecBuff, (uint32_t)AUDIO_BUFF);
-//  HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1, (uint32_t*)PlayBuff, (uint32_t)AUDIO_BUFF, DAC_ALIGN_8B_R);
-//
-//
-//  HAL_Delay(500);
-
-
-//  HAL_TIM_Base_Start_IT(&htim2);
   HAL_TIM_Base_Start_IT(&htim3);
   while (1)
   {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-//	  if(DmaRecHalfBuffCplt == 1) {
-//		  for(uint32_t i = 0; i<AUDIO_BUFF/2;i++) {
-//			  PlayBuff[i] = (RecBuff[i] >> 8)*170/16777216;
-//		  }
-//		  DmaRecHalfBuffCplt = 0;
-//	  }
-//	  if(DmaRecBuffCplt == 1) {
-//		  for(uint32_t i = 0; i<AUDIO_BUFF;i++) {
-//			  PlayBuff[i] = (((uint32_t)RecBuff[i]) >> 8)*170/16777216;
-//		  }
-//		  DmaRecBuffCplt = 0;
-//	  }
+
   }
   /* USER CODE END 3 */
 }
@@ -523,59 +428,10 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 	// Making sure the interrupt was caused by the PC13
 	if (GPIO_Pin == BLUE_BUTTON_Pin)
 	{
-		switch(stateLED)
-		{
-			case OFF:
-				stateLED = BLINKING;
-				break;
-			case BLINKING:
-				stateLED = ON;
-				break;
-			case ON:
-				stateLED = OFF;
-				break;
-		}
-
+		HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
 	}
 
 }
-
-/**
- * @overwrite
- * @brief interrupt service routine for timers
- */
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
-
-	// Making sure that interrupt was caused by TIM2
-
-
-	if (htim == &htim3) // ISR for TIM3
-	{
-		switch(stateLED)
-		{
-			case OFF:
-				HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
-				break;
-			case BLINKING:
-				HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
-				break;
-			case ON:
-				HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_SET);
-				break;
-		}
-	}
-}
-
-
-//
-//void HAL_DFSDM_FilterRegConvHalfCpltCallback (DFSDM_Filter_HandleTypeDef * hdfsdm_filter) {
-//	DmaRecHalfBuffCplt = 1;
-//}
-//
-//void HAL_DFSDM_FilterRegConvCpltCallback (DFSDM_Filter_HandleTypeDef * hdfsdm_filter){
-//	DmaRecBuffCplt = 1;
-//}
-
 
 
 /* USER CODE END 4 */
