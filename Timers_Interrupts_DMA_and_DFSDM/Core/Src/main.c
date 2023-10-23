@@ -569,6 +569,11 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 	{
 		switch(programState)
 		{
+			case PLAY_NOTES:
+				HAL_TIM_Base_Stop_IT(&htim4);
+				HAL_TIM_Base_DeInit(&htim4); // de-initialize the timer so that if its interrupted, its reset
+			case PLAYBACK:
+				HAL_DAC_Stop_DMA(&hdac1, DAC_CHANNEL_1);
 			case WAIT_FOR_RECORDING:
 				programState = RECORDING;
 				stateLED = BLINKING;
@@ -580,6 +585,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 				stateLED = ON;
 				currentNote = noteC7;
 				htim2.Instance->PSC = prescalerC7;
+				HAL_TIM_Base_Init(&htim4);
 				HAL_TIM_Base_Start_IT(&htim4);
 				HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1, (uint32_t*)sinArray, (uint32_t)NUM_SAMPLES, DAC_ALIGN_8B_R);
 				break;
@@ -595,7 +601,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
  * @brief interrupt service routine for timers
  */
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
-
+	// SOFTWARE INTERRUPTS SHOULD BE AS SHORT AS POSSIBLE!!!!!!!!!!!!!
 	// Making sure that interrupt was caused by TIM2
 
 
@@ -652,6 +658,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 
 void HAL_DAC_ConvCpltCallbackCh1(DAC_HandleTypeDef *hdac)
 {
+	// SOFTWARE INTERRUPTS SHOULD BE AS SHORT AS POSSIBLE!!!!!!!!!!!!!
 	if (programState == PLAYBACK)
 	{
 		HAL_DAC_Stop_DMA(&hdac1, DAC_CHANNEL_1);
@@ -662,6 +669,7 @@ void HAL_DAC_ConvCpltCallbackCh1(DAC_HandleTypeDef *hdac)
 
 void HAL_DFSDM_FilterRegConvCpltCallback(DFSDM_Filter_HandleTypeDef *hdfsdm_filter)
 {
+	// SOFTWARE INTERRUPTS SHOULD BE AS SHORT AS POSSIBLE!!!!!!!!!!!!!
 	// ISR for filling buffer during recording
 	/*
 	 * Instead of doing post-processing in the interrupt we have a flag to do it in main program.
