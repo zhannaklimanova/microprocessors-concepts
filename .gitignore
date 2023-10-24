@@ -32,6 +32,7 @@ RemoteSystemsTempFiles/
 *.a
 *.la
 *.lo
+!libarm_cortexM4lf_math.a
 
 # Shared objects
 *.dll
