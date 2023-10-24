@@ -67,10 +67,10 @@ TIM_HandleTypeDef htim3;
 TIM_HandleTypeDef htim4;
 
 /* USER CODE BEGIN PV */
-uint32_t sinArray[NUM_SAMPLES];
+uint32_t sinArray[NUM_SAMPLES]; // it's an array so does not need to be volatile
 
 ////////////////PART 4////////////////////
-int32_t audioBuffer[AUDIO_BUFFER_SIZE];
+int32_t audioBuffer[AUDIO_BUFFER_SIZE];  // it's an array so does not need to be volatile
 
 enum Notes
 {
@@ -99,9 +99,9 @@ enum ProgramStates
 	PLAYBACK
 };
 
-enum Notes currentNote;
-enum LED stateLED = OFF;
-enum ProgramStates programState = WAIT_FOR_RECORDING;
+enum Notes currentNote; // only used in HAL_TIM_PeriodElapsedCallback
+volatile enum LED stateLED = OFF;
+volatile enum ProgramStates programState = WAIT_FOR_RECORDING;
 
 uint32_t prescalerC7;
 uint32_t prescalerB6;
