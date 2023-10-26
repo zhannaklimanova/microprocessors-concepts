@@ -31,10 +31,12 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define NUM_SAMPLES 16
-#define MAX_DAC 170
-#define MAX_SIN_SHIFTED_AMPLITUDE 2
-#define AUDIO_BUFFER_SIZE 24000
+// NOTE: that the sampling frequency is 8000Hz and is performed by TIM2 with prescaler=125 and counter=80
+#define SIN_NUM_SAMPLES 16 // only affects the generated sin wave so no need to increase this number
+#define MAX_DAC_ALIGN_8B 170 // 2/3 of possible dynamic range 2^8 = 256
+#define MAX_DAC_ALIGN_12B 2730 // 2/3 of possible dynamic range 2^12 = 4096
+#define MAX_AMPLITUDE_OF_SHIFTED_SIN 2 // use in cross product to scale a unitary sin wave to one that has a peak of the max dac
+#define AUDIO_BUFFER_SIZE 24000 // 8000samples/sec * 3sec = 24000samples
 
 // Frequency Constants
 #define C7 2093
@@ -43,9 +45,6 @@
 #define G6 1567
 #define E6 1318
 #define Eb6 1244
-
-
-////////////////PART 4////////////////////
 
 /* USER CODE END PD */
 
@@ -67,10 +66,18 @@ TIM_HandleTypeDef htim3;
 TIM_HandleTypeDef htim4;
 
 /* USER CODE BEGIN PV */
-uint32_t sinArray[NUM_SAMPLES];
+uint32_t sinArray[SIN_NUM_SAMPLES];
+volatile int32_t audioBuffer[AUDIO_BUFFER_SIZE];
+uint32_t systemClkFrequency; // used to store value 80MHz, so we don't call function multiple times
 
-////////////////PART 4////////////////////
-int32_t audioBuffer[AUDIO_BUFFER_SIZE];
+// Polling Frequencies
+uint32_t prescalerC7; // polling frequency of C7 or 2093Hz
+uint32_t prescalerB6;
+uint32_t prescalerAb6;
+uint32_t prescalerG6;
+uint32_t prescalerE6;
+uint32_t prescalerEb6;
+uint32_t prescalerMicrophone; // polling frequency of our microphone
 
 enum Notes
 {
@@ -103,15 +110,6 @@ enum Notes currentNote;
 enum LED stateLED = OFF;
 enum ProgramStates programState = WAIT_FOR_RECORDING;
 
-uint32_t prescalerC7;
-uint32_t prescalerB6;
-uint32_t prescalerAb6;
-uint32_t prescalerG6;
-uint32_t prescalerE6;
-uint32_t prescalerEb6;
-uint32_t prescalerMicrophone; // polling frequency of our microphone
-
-uint32_t systemClkFrequency;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -167,25 +165,32 @@ int main(void)
   MX_TIM3_Init();
   MX_TIM4_Init();
   /* USER CODE BEGIN 2 */
+
+  // Generate sinusoidal wave table
   float32_t sinValue = 0;
   // Creating samples for sine wave
-  for (uint32_t sample=0; sample<NUM_SAMPLES; sample++)
+  for (uint32_t sample=0; sample<SIN_NUM_SAMPLES; sample++)
   {
-	  sinValue = arm_sin_f32(2*PI/NUM_SAMPLES*sample);
-	  sinValue += 1.0; // shift function into positive x (range of sin function is 2)
-	   // Using 8 bit so 256 DAC (don't want to go over 2/3 of DAC because it creates clipping so use 170)
+	  sinValue = arm_sin_f32(2*PI/SIN_NUM_SAMPLES*sample);
+	  sinValue += 1.0; // shift function into positive x (range of sin function is MAX_AMPLITUDE_OF_SHIFTED_SIN = 2)
+	  // Using 8 bit so 256 DAC (don't want to go over 2/3 of DAC because it creates clipping so use 170)
 	  // We have sin function amplitude of 2 maximum and we want to scale it to be over 170 bit
-	  sinValue = sinValue / MAX_SIN_SHIFTED_AMPLITUDE * MAX_DAC;
+	  sinValue = sinValue / MAX_AMPLITUDE_OF_SHIFTED_SIN * MAX_DAC_ALIGN_8B; // making the waveform the loudest that it can be on DAC without clipping
 	  sinArray[sample] = (uint32_t)sinValue;
   }
-  // Calculate prescaler values
+
+  // Calculate prescaler values for each note - how fast we will output samples
   systemClkFrequency = HAL_RCC_GetSysClockFreq();
-  prescalerC7 = systemClkFrequency / ((htim2.Instance->ARR) * C7 * NUM_SAMPLES);
-  prescalerB6 = systemClkFrequency / ((htim2.Instance->ARR) * B6 * NUM_SAMPLES);
-  prescalerAb6 = systemClkFrequency / ((htim2.Instance->ARR) * Ab6 * NUM_SAMPLES);
-  prescalerG6 = systemClkFrequency / ((htim2.Instance->ARR) * G6 * NUM_SAMPLES);
-  prescalerE6 = systemClkFrequency / ((htim2.Instance->ARR) * E6 * NUM_SAMPLES);
-  prescalerEb6 = systemClkFrequency / ((htim2.Instance->ARR) * Eb6 * NUM_SAMPLES);
+
+  // period * system_clock = prescaler * counter
+  // system_clock / note_frequency = prescaler * counter
+  // Multiply by SIN_NUM_SAMPLES to output at every sample with the frequency, not the full length period
+  prescalerC7 = systemClkFrequency / ((htim2.Instance->ARR) * C7 * SIN_NUM_SAMPLES);
+  prescalerB6 = systemClkFrequency / ((htim2.Instance->ARR) * B6 * SIN_NUM_SAMPLES);
+  prescalerAb6 = systemClkFrequency / ((htim2.Instance->ARR) * Ab6 * SIN_NUM_SAMPLES);
+  prescalerG6 = systemClkFrequency / ((htim2.Instance->ARR) * G6 * SIN_NUM_SAMPLES);
+  prescalerE6 = systemClkFrequency / ((htim2.Instance->ARR) * E6 * SIN_NUM_SAMPLES);
+  prescalerEb6 = systemClkFrequency / ((htim2.Instance->ARR) * Eb6 * SIN_NUM_SAMPLES);
   prescalerMicrophone = htim2.Instance->PSC;
 
   /* USER CODE END 2 */
@@ -196,17 +201,15 @@ int main(void)
   HAL_TIM_Base_Start_IT(&htim3);
   while (1)
   {
-	  // NOTE That there's a playback delay. You record it fast and the playback is slow
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	 //////////////// programState = POST_PROCESSING ////////////////
-	 if (programState == POST_PROCESSING)
+	 if (programState==POST_PROCESSING)
 	 {
 		 for (uint32_t i=0; i<AUDIO_BUFFER_SIZE; i++)
 		 {
 			audioBuffer[i] = (uint32_t)audioBuffer[i] >> 8; // remove channel information from 24-bit DFSDM output
-			audioBuffer[i] = audioBuffer[i] * MAX_DAC; // scale value from microphone to the scale DAC can output
+			audioBuffer[i] = audioBuffer[i] * MAX_DAC_ALIGN_8B; // scale value from microphone to the scale DAC can output
 			audioBuffer[i] = (uint32_t)audioBuffer[i] >> 24; // its like dividing by 2^24
 		 }
 		 programState = WAIT_FOR_PLAYBACK;
@@ -558,19 +561,20 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 /**
- * @overwriteGPIO_PIN_RESET
+ * @overwrite
  * @brief interrupt service routine for GPIO
  */
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
-	// Making sure the interrupt was caused by the PC13
-	if (GPIO_Pin == BLUE_BUTTON_Pin)
+	// Making sure the interrupt was caused by the PC13 or the BLUE_BUTTON
+	if (GPIO_Pin==BLUE_BUTTON_Pin)
 	{
 		switch(programState)
 		{
 			case PLAY_NOTES:
+				// TIM4 is used to control the note playback
 				HAL_TIM_Base_Stop_IT(&htim4);
-				HAL_TIM_Base_DeInit(&htim4); // de-initialize the timer so that if its interrupted, its reset
+				HAL_TIM_Base_DeInit(&htim4); // de-initialize the timer so that if its interrupted during note playback, it's reset
 			case PLAYBACK:
 				HAL_DAC_Stop_DMA(&hdac1, DAC_CHANNEL_1);
 			case WAIT_FOR_RECORDING:
@@ -584,9 +588,9 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 				stateLED = ON;
 				currentNote = noteC7;
 				htim2.Instance->PSC = prescalerC7;
-				HAL_TIM_Base_Init(&htim4);
-				HAL_TIM_Base_Start_IT(&htim4);
-				HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1, (uint32_t*)sinArray, (uint32_t)NUM_SAMPLES, DAC_ALIGN_8B_R);
+				HAL_TIM_Base_Init(&htim4); // bc we de-initialized it during a PLAY_NOTES interrupt, we need to re-initialize
+				HAL_TIM_Base_Start_IT(&htim4); // start interrupt
+				HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1, (uint32_t*)sinArray, (uint32_t)SIN_NUM_SAMPLES, DAC_ALIGN_8B_R); // start writing DAC with samples
 				break;
 			default:
 				break;
@@ -601,10 +605,9 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
  */
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 	// SOFTWARE INTERRUPTS SHOULD BE AS SHORT AS POSSIBLE!!!!!!!!!!!!!
-	// Making sure that interrupt was caused by TIM2
 
-
-	if (htim == &htim3) // ISR for TIM3
+	// TIM3 is used to control the LED
+	if (htim==&htim3) // ISR for TIM3
 	{
 		switch(stateLED)
 		{
@@ -612,14 +615,14 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 				HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
 				break;
 			case BLINKING:
-				HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+				HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin); // blinks every 0.5 seconds
 				break;
 			case ON:
 				HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_SET);
 				break;
 		}
-	}
-	else if (htim == &htim4)
+	} // TIM4 is used to control the note playback
+	else if (htim==&htim4)
 	{
 		switch(currentNote)
 		{
@@ -649,7 +652,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 				HAL_TIM_Base_Stop_IT(&htim4);
 				// DFSDM_FLT0 should be set to Normal so that DFSDM is stopped when its finished WRITING the recording buffer
 				HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1, (uint32_t*)audioBuffer, (uint32_t)AUDIO_BUFFER_SIZE, DAC_ALIGN_8B_R);
-				programState = PLAYBACK; // stateLED = ON;
+				programState = PLAYBACK; // play the recorded sample now and set stateLED = ON;
 				break;
 		}
 	}
@@ -658,7 +661,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 void HAL_DAC_ConvCpltCallbackCh1(DAC_HandleTypeDef *hdac)
 {
 	// SOFTWARE INTERRUPTS SHOULD BE AS SHORT AS POSSIBLE!!!!!!!!!!!!!
-	if (programState == PLAYBACK)
+	// Playing the recorded sample
+	if (programState==PLAYBACK)
 	{
 		HAL_DAC_Stop_DMA(&hdac1, DAC_CHANNEL_1);
 		programState = WAIT_FOR_RECORDING; // when finished playback the ISR is done and so go to new state
