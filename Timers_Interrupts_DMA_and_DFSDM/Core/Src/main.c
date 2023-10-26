@@ -36,7 +36,9 @@
 #define MAX_DAC_ALIGN_8B 170 // 2/3 of possible dynamic range 2^8 = 256
 #define MAX_DAC_ALIGN_12B 2730 // 2/3 of possible dynamic range 2^12 = 4096
 #define MAX_AMPLITUDE_OF_SHIFTED_SIN 2 // use in cross product to scale a unitary sin wave to one that has a peak of the max dac
-#define AUDIO_BUFFER_SIZE 24000 // 8000samples/sec * 3sec = 24000samples
+//#define AUDIO_BUFFER_SIZE 24000 // 8000samples/sec * 3sec = 24000samples
+#define RECORDING_BUFFER_SIZE 1000
+#define PLAYBACK_BUFFER_SIZE RECORDING_BUFFER_SIZE * 48
 
 // Frequency Constants
 #define C7 2093
@@ -67,7 +69,10 @@ TIM_HandleTypeDef htim4;
 
 /* USER CODE BEGIN PV */
 uint32_t sinArray[SIN_NUM_SAMPLES];
-volatile int32_t audioBuffer[AUDIO_BUFFER_SIZE];
+//volatile int32_t audioBuffer[AUDIO_BUFFER_SIZE];
+uint32_t playbackBufferOffset = 0;
+uint32_t recordingBuffer[RECORDING_BUFFER_SIZE];
+uint8_t playbackBuffer[PLAYBACK_BUFFER_SIZE];
 uint32_t systemClkFrequency; // used to store value 80MHz, so we don't call function multiple times
 
 // Polling Frequencies
@@ -206,14 +211,25 @@ int main(void)
     /* USER CODE BEGIN 3 */
 	 if (programState==POST_PROCESSING)
 	 {
-		 for (uint32_t i=0; i<AUDIO_BUFFER_SIZE; i++)
+		 for (uint32_t i=0; i<RECORDING_BUFFER_SIZE; i++)
 		 {
-			audioBuffer[i] = (uint32_t)audioBuffer[i] >> 8; // remove channel information from 24-bit DFSDM output
-			audioBuffer[i] = audioBuffer[i] * MAX_DAC_ALIGN_8B; // scale value from microphone to the scale DAC can output
-			audioBuffer[i] = (uint32_t)audioBuffer[i] >> 24; // its like dividing by 2^24
+			recordingBuffer[i] = (uint32_t)recordingBuffer[i] >> 8; // remove channel information from 24-bit DFSDM output (cast to uint32_t because its supposed to stay positive after shift)
+			recordingBuffer[i] = recordingBuffer[i] * MAX_DAC_ALIGN_8B; // scale value from microphone to the scale DAC can output
+			recordingBuffer[i] = (uint32_t)recordingBuffer[i] >> 24; // its like dividing by 2^24
+			playbackBuffer[playbackBufferOffset+i] = (uint8_t)recordingBuffer[i];
 		 }
-		 programState = WAIT_FOR_PLAYBACK;
-		 stateLED = OFF;
+		 playbackBufferOffset += RECORDING_BUFFER_SIZE;
+		 if (playbackBufferOffset==PLAYBACK_BUFFER_SIZE)
+		 {
+			 programState = WAIT_FOR_PLAYBACK;
+			 stateLED = OFF;
+		 }
+		 else
+		 {
+			 programState = RECORDING; // stateLED = BLINKING;
+			 HAL_DFSDM_FilterRegularStart_DMA(&hdfsdm1_filter0, (int32_t*)recordingBuffer, (uint32_t)RECORDING_BUFFER_SIZE);
+		 }
+
 	 }
   }
   /* USER CODE END 3 */
@@ -580,8 +596,9 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 			case WAIT_FOR_RECORDING:
 				programState = RECORDING;
 				stateLED = BLINKING;
+				playbackBufferOffset = 0;
 				// DAC_CH1 should be set to Normal so that DAC is stopped when its finished READING the recording buffer
-				HAL_DFSDM_FilterRegularStart_DMA(&hdfsdm1_filter0, (int32_t*)audioBuffer, (uint32_t)AUDIO_BUFFER_SIZE);
+				HAL_DFSDM_FilterRegularStart_DMA(&hdfsdm1_filter0, (int32_t*)recordingBuffer, (uint32_t)RECORDING_BUFFER_SIZE);
 				break;
 			case WAIT_FOR_PLAYBACK:
 				programState = PLAY_NOTES;
@@ -651,7 +668,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 				HAL_DAC_Stop_DMA(&hdac1, DAC_CHANNEL_1);
 				HAL_TIM_Base_Stop_IT(&htim4);
 				// DFSDM_FLT0 should be set to Normal so that DFSDM is stopped when its finished WRITING the recording buffer
-				HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1, (uint32_t*)audioBuffer, (uint32_t)AUDIO_BUFFER_SIZE, DAC_ALIGN_8B_R);
+				HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1, (uint32_t*)playbackBuffer, (uint32_t)PLAYBACK_BUFFER_SIZE, DAC_ALIGN_8B_R);
 				programState = PLAYBACK; // play the recorded sample now and set stateLED = ON;
 				break;
 		}
