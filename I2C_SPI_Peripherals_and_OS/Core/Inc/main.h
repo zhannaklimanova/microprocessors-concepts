@@ -31,7 +31,12 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "stm32l475e_iot01_tsensor.h"
+#include "stm32l475e_iot01_magneto.h"
+#include "stm32l475e_iot01_psensor.h"
+#include "stm32l475e_iot01_gyro.h"
+#include <stdio.h>
+#include <string.h>
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
