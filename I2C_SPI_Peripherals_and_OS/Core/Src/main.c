@@ -49,9 +49,20 @@ UART_HandleTypeDef huart1;
 /* USER CODE BEGIN PV */
 float tsensor;
 int16_t magneto[3];
-float pressure;
+float psensor;
 float gyro[3];
 char bufferUART[98];
+
+enum ProgramStates
+{
+	NOT_ACTIVATED,
+	TSENSOR,
+	MAGNETO,
+	PSENSOR,
+	GYRO
+};
+
+enum ProgramStates programState = NOT_ACTIVATED;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -305,11 +316,23 @@ static void MX_USART1_UART_Init(void)
   */
 static void MX_GPIO_Init(void)
 {
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
 /* USER CODE BEGIN MX_GPIO_Init_1 */
 /* USER CODE END MX_GPIO_Init_1 */
 
   /* GPIO Ports Clock Enable */
+  __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
+
+  /*Configure GPIO pin : BLUE_BUTTON_Pin */
+  GPIO_InitStruct.Pin = BLUE_BUTTON_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(BLUE_BUTTON_GPIO_Port, &GPIO_InitStruct);
+
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
@@ -324,11 +347,52 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
 	tsensor = BSP_TSENSOR_ReadTemp();
 	BSP_MAGNETO_GetXYZ(magneto);
-	pressure = BSP_PSENSOR_ReadPressure();
+	psensor = BSP_PSENSOR_ReadPressure();
 	BSP_GYRO_GetXYZ(gyro);
 
-	sprintf(bufferUART, "Temperature reading: %.2f\r\n", tsensor);
-	HAL_UART_Transmit(&huart1, (uint8_t*)bufferUART, sizeof(bufferUART)/sizeof(bufferUART[0]), 1000);
+//	sprintf(bufferUART, "Temperature reading: %.2f\r\n", tsensor);
+//	HAL_UART_Transmit(&huart1, (uint8_t*)bufferUART, sizeof(bufferUART)/sizeof(bufferUART[0]), 1000);
+}
+
+/**
+ * @overwrite
+ * @brief interrupt service routine for GPIO
+ */
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+	if (GPIO_Pin==BLUE_BUTTON_Pin)
+	{
+		switch(programState)
+		{
+			case NOT_ACTIVATED:
+				programState = TSENSOR;
+				memset(bufferUART, 0, sizeof(bufferUART)/sizeof(bufferUART[0]));
+				sprintf(bufferUART, "Temperature reading: %.2f\r\n", tsensor);
+				HAL_UART_Transmit(&huart1, (uint8_t*)bufferUART, sizeof(bufferUART)/sizeof(bufferUART[0]), 1000);
+				break;
+			case TSENSOR:
+				programState = MAGNETO;
+				memset(bufferUART, 0, sizeof(bufferUART)/sizeof(bufferUART[0]));
+				sprintf(bufferUART, "Magneto reading xyz: %d, %d, %d\r\n", magneto[0], magneto[1], magneto[2]);
+				HAL_UART_Transmit(&huart1, (uint8_t*)bufferUART, sizeof(bufferUART)/sizeof(bufferUART[0]), 1000);
+				break;
+			case MAGNETO:
+				programState = PSENSOR;
+				memset(bufferUART, 0, sizeof(bufferUART)/sizeof(bufferUART[0]));
+				sprintf(bufferUART, "Pressure reading: %.2f\r\n", psensor);
+				HAL_UART_Transmit(&huart1, (uint8_t*)bufferUART, sizeof(bufferUART)/sizeof(bufferUART[0]), 1000);
+				break;
+			case PSENSOR:
+				programState = GYRO;
+				memset(bufferUART, 0, sizeof(bufferUART)/sizeof(bufferUART[0]));
+				sprintf(bufferUART, "Gyro reading xyz: %.2f, %.2f, %.2f\r\n", gyro[0], gyro[1], gyro[2]);
+				HAL_UART_Transmit(&huart1, (uint8_t*)bufferUART, sizeof(bufferUART)/sizeof(bufferUART[0]), 1000);
+				programState = NOT_ACTIVATED;
+				break;
+			default:
+				break;
+		}
+	}
 }
 
 /* USER CODE END 4 */
