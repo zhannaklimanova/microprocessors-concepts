@@ -51,6 +51,7 @@ float tsensor;
 int16_t magneto[3];
 float pressure;
 float gyro[3];
+char bufferUART[98];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -309,7 +310,6 @@ static void MX_GPIO_Init(void)
 
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOB_CLK_ENABLE();
-  __HAL_RCC_GPIOA_CLK_ENABLE();
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
@@ -326,6 +326,9 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 	BSP_MAGNETO_GetXYZ(magneto);
 	pressure = BSP_PSENSOR_ReadPressure();
 	BSP_GYRO_GetXYZ(gyro);
+
+	sprintf(bufferUART, "Temperature reading: %.2f\r\n", tsensor);
+	HAL_UART_Transmit(&huart1, (uint8_t*)bufferUART, sizeof(bufferUART)/sizeof(bufferUART[0]), 1000);
 }
 
 /* USER CODE END 4 */
