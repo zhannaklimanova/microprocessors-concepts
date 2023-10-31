@@ -56,7 +56,8 @@ float gyro[3];
 char bufferUART[98];
 
 float writeFloatValue = 3.14;
-uint8_t writeIntegerValue = 44;
+uint8_t writeIntegerValue = 0x0f;
+uint8_t writeIntegerValue2 = 0xf0;
 float readFloatValue;
 uint8_t readIntegerValue;
 uint8_t writeIntegerValues[8] = {1,2,3,4,5,6,7,8};
@@ -145,15 +146,23 @@ int main(void)
 	  }
 	  else
 	  {
-		  if (BSP_QSPI_Read(readIntegerValues, FLASH_BLOCK, sizeof(readIntegerValues)) != QSPI_OK)
+		  if (BSP_QSPI_Read(&readIntegerValue, FLASH_BLOCK, sizeof(readIntegerValue)) != QSPI_OK)
 		  {
 			  Error_Handler();
 		  }
-		  if (BSP_QSPI_Write(writeIntegerValues, (uint32_t) FLASH_BLOCK, sizeof(writeIntegerValues)) != QSPI_OK)
+		  if (BSP_QSPI_Write(&writeIntegerValue, (uint32_t) FLASH_BLOCK, sizeof(writeIntegerValue)) != QSPI_OK)
 		  {
 			  Error_Handler();
 		  }
-		  if (BSP_QSPI_Read(readIntegerValues, FLASH_BLOCK, sizeof(readIntegerValues)) != QSPI_OK)
+		  if (BSP_QSPI_Read(&readIntegerValue, FLASH_BLOCK, sizeof(readIntegerValue)) != QSPI_OK)
+		  {
+			  Error_Handler();
+		  }
+		  if (BSP_QSPI_Write(&writeIntegerValue2, (uint32_t) FLASH_BLOCK, sizeof(writeIntegerValue2)) != QSPI_OK)
+		  {
+			  Error_Handler();
+		  }
+		  if (BSP_QSPI_Read(&readIntegerValue, FLASH_BLOCK, sizeof(readIntegerValue)) != QSPI_OK)
 		  {
 			  Error_Handler();
 		  }
