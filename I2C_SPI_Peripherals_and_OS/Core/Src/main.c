@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "cmsis_os.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -46,6 +47,9 @@ TIM_HandleTypeDef htim2;
 
 UART_HandleTypeDef huart1;
 
+osThreadId buttonTaskHandle;
+osThreadId TransmitUARTTasHandle;
+osThreadId ReadSensorTaskHandle;
 /* USER CODE BEGIN PV */
 float tsensor;
 int16_t magneto[3];
@@ -53,16 +57,23 @@ float psensor;
 float gyro[3];
 char bufferUART[98];
 
+enum ButtonStates
+{
+	NOT_PRESSED,
+	PRESSED
+};
+
 enum ProgramStates
 {
-	NOT_ACTIVATED,
 	TSENSOR,
 	MAGNETO,
 	PSENSOR,
 	GYRO
 };
 
-enum ProgramStates programState = NOT_ACTIVATED;
+enum ButtonStates buttonState = NOT_PRESSED;
+enum ProgramStates programState = TSENSOR;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -71,6 +82,10 @@ static void MX_GPIO_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_I2C2_Init(void);
 static void MX_TIM2_Init(void);
+void StartButtonTask(void const * argument);
+void StartTransmitUARTTask(void const * argument);
+void StartReadSensorTask(void const * argument);
+
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -120,6 +135,43 @@ int main(void)
 
   /* USER CODE END 2 */
 
+  /* USER CODE BEGIN RTOS_MUTEX */
+  /* add mutexes, ... */
+  /* USER CODE END RTOS_MUTEX */
+
+  /* USER CODE BEGIN RTOS_SEMAPHORES */
+  /* add semaphores, ... */
+  /* USER CODE END RTOS_SEMAPHORES */
+
+  /* USER CODE BEGIN RTOS_TIMERS */
+  /* start timers, add new ones, ... */
+  /* USER CODE END RTOS_TIMERS */
+
+  /* USER CODE BEGIN RTOS_QUEUES */
+  /* add queues, ... */
+  /* USER CODE END RTOS_QUEUES */
+
+  /* Create the thread(s) */
+  /* definition and creation of buttonTask */
+  osThreadDef(buttonTask, StartButtonTask, osPriorityNormal, 0, 128);
+  buttonTaskHandle = osThreadCreate(osThread(buttonTask), NULL);
+
+  /* definition and creation of TransmitUARTTas */
+  osThreadDef(TransmitUARTTas, StartTransmitUARTTask, osPriorityNormal, 0, 256);
+  TransmitUARTTasHandle = osThreadCreate(osThread(TransmitUARTTas), NULL);
+
+  /* definition and creation of ReadSensorTask */
+  osThreadDef(ReadSensorTask, StartReadSensorTask, osPriorityNormal, 0, 128);
+  ReadSensorTaskHandle = osThreadCreate(osThread(ReadSensorTask), NULL);
+
+  /* USER CODE BEGIN RTOS_THREADS */
+  /* add threads, ... */
+  /* USER CODE END RTOS_THREADS */
+
+  /* Start scheduler */
+  osKernelStart();
+
+  /* We should never get here as control is now taken by the scheduler */
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
@@ -331,7 +383,7 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_Init(BLUE_BUTTON_GPIO_Port, &GPIO_InitStruct);
 
   /* EXTI interrupt init*/
-  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
+  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 5, 0);
   HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
@@ -339,20 +391,6 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-/**
- * @overwrite
- * @brief interrupt service routine for timers
- */
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
-{
-	tsensor = BSP_TSENSOR_ReadTemp();
-	BSP_MAGNETO_GetXYZ(magneto);
-	psensor = BSP_PSENSOR_ReadPressure();
-	BSP_GYRO_GetXYZ(gyro);
-
-//	sprintf(bufferUART, "Temperature reading: %.2f\r\n", tsensor);
-//	HAL_UART_Transmit(&huart1, (uint8_t*)bufferUART, sizeof(bufferUART)/sizeof(bufferUART[0]), 1000);
-}
 
 /**
  * @overwrite
@@ -362,32 +400,10 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
 	if (GPIO_Pin==BLUE_BUTTON_Pin)
 	{
-		switch(programState)
+		switch(buttonState)
 		{
-			case NOT_ACTIVATED:
-				programState = TSENSOR;
-				memset(bufferUART, 0, sizeof(bufferUART)/sizeof(bufferUART[0]));
-				sprintf(bufferUART, "Temperature reading: %.2f\r\n", tsensor);
-				HAL_UART_Transmit(&huart1, (uint8_t*)bufferUART, sizeof(bufferUART)/sizeof(bufferUART[0]), 1000);
-				break;
-			case TSENSOR:
-				programState = MAGNETO;
-				memset(bufferUART, 0, sizeof(bufferUART)/sizeof(bufferUART[0]));
-				sprintf(bufferUART, "Magneto reading xyz: %d, %d, %d\r\n", magneto[0], magneto[1], magneto[2]);
-				HAL_UART_Transmit(&huart1, (uint8_t*)bufferUART, sizeof(bufferUART)/sizeof(bufferUART[0]), 1000);
-				break;
-			case MAGNETO:
-				programState = PSENSOR;
-				memset(bufferUART, 0, sizeof(bufferUART)/sizeof(bufferUART[0]));
-				sprintf(bufferUART, "Pressure reading: %.2f\r\n", psensor);
-				HAL_UART_Transmit(&huart1, (uint8_t*)bufferUART, sizeof(bufferUART)/sizeof(bufferUART[0]), 1000);
-				break;
-			case PSENSOR:
-				programState = GYRO;
-				memset(bufferUART, 0, sizeof(bufferUART)/sizeof(bufferUART[0]));
-				sprintf(bufferUART, "Gyro reading xyz: %.2f, %.2f, %.2f\r\n", gyro[0], gyro[1], gyro[2]);
-				HAL_UART_Transmit(&huart1, (uint8_t*)bufferUART, sizeof(bufferUART)/sizeof(bufferUART[0]), 1000);
-				programState = NOT_ACTIVATED;
+			case NOT_PRESSED:
+				buttonState = PRESSED;
 				break;
 			default:
 				break;
@@ -396,6 +412,124 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 }
 
 /* USER CODE END 4 */
+
+/* USER CODE BEGIN Header_StartButtonTask */
+/**
+  * @brief  Function implementing the buttonTask thread.
+  * @param  argument: Not used
+  * @retval None
+  */
+/* USER CODE END Header_StartButtonTask */
+void StartButtonTask(void const * argument)
+{
+  /* USER CODE BEGIN 5 */
+  /* Infinite loop */
+  for(;;)
+  {
+	osDelay(500);
+	if (buttonState==PRESSED)
+	{
+	  switch(programState)
+	  {
+		  case TSENSOR:
+			  programState = MAGNETO;
+			  break;
+		  case MAGNETO:
+			  programState = PSENSOR;
+			  break;
+		  case PSENSOR:
+			  programState = GYRO;
+			  break;
+		  case GYRO:
+			  programState = TSENSOR;
+			  break;
+	  }
+	  buttonState = NOT_PRESSED;
+	}
+  }
+  /* USER CODE END 5 */
+}
+
+/* USER CODE BEGIN Header_StartTransmitUARTTask */
+/**
+* @brief Function implementing the TransmitUARTTas thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartTransmitUARTTask */
+void StartTransmitUARTTask(void const * argument)
+{
+  /* USER CODE BEGIN StartTransmitUARTTask */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(100);
+    switch(programState)
+    {
+    	case TSENSOR:
+    		memset(bufferUART, 0, sizeof(bufferUART)/sizeof(bufferUART[0]));
+			sprintf(bufferUART, "Temperature reading: %.2f\r\n", tsensor);
+			break;
+    	case MAGNETO:
+    		memset(bufferUART, 0, sizeof(bufferUART)/sizeof(bufferUART[0]));
+    		sprintf(bufferUART, "Magneto reading xyz: %d, %d, %d\r\n", magneto[0], magneto[1], magneto[2]);
+    		break;
+    	case PSENSOR:
+    		memset(bufferUART, 0, sizeof(bufferUART)/sizeof(bufferUART[0]));
+    		sprintf(bufferUART, "Pressure reading: %.2f\r\n", psensor);
+    		break;
+    	case GYRO:
+    		memset(bufferUART, 0, sizeof(bufferUART)/sizeof(bufferUART[0]));
+    		sprintf(bufferUART, "Gyro reading xyz: %.2f, %.2f, %.2f\r\n", gyro[0], gyro[1], gyro[2]);
+    		break;
+    }
+    HAL_UART_Transmit(&huart1, (uint8_t*)bufferUART, sizeof(bufferUART)/sizeof(bufferUART[0]), 1000);
+  }
+  /* USER CODE END StartTransmitUARTTask */
+}
+
+/* USER CODE BEGIN Header_StartReadSensorTask */
+/**
+* @brief Function implementing the ReadSensorTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartReadSensorTask */
+void StartReadSensorTask(void const * argument)
+{
+  /* USER CODE BEGIN StartReadSensorTask */
+  /* Infinite loop */
+  for(;;)
+  {
+	osDelay(100); // 10Hz or 0.1s
+	tsensor = BSP_TSENSOR_ReadTemp();
+	BSP_MAGNETO_GetXYZ(magneto);
+	psensor = BSP_PSENSOR_ReadPressure();
+	BSP_GYRO_GetXYZ(gyro);
+  }
+  /* USER CODE END StartReadSensorTask */
+}
+
+/**
+  * @brief  Period elapsed callback in non blocking mode
+  * @note   This function is called  when TIM6 interrupt took place, inside
+  * HAL_TIM_IRQHandler(). It makes a direct call to HAL_IncTick() to increment
+  * a global variable "uwTick" used as application time base.
+  * @param  htim : TIM handle
+  * @retval None
+  */
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+  /* USER CODE BEGIN Callback 0 */
+
+  /* USER CODE END Callback 0 */
+  if (htim->Instance == TIM6) {
+    HAL_IncTick();
+  }
+  /* USER CODE BEGIN Callback 1 */
+
+  /* USER CODE END Callback 1 */
+}
 
 /**
   * @brief  This function is executed in case of error occurrence.
