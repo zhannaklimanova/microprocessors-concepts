@@ -43,6 +43,8 @@
 /* Private variables ---------------------------------------------------------*/
 I2C_HandleTypeDef hi2c2;
 
+QSPI_HandleTypeDef hqspi;
+
 TIM_HandleTypeDef htim2;
 
 UART_HandleTypeDef huart1;
@@ -82,6 +84,7 @@ static void MX_GPIO_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_I2C2_Init(void);
 static void MX_TIM2_Init(void);
+static void MX_QUADSPI_Init(void);
 void StartButtonTask(void const * argument);
 void StartTransmitUARTTask(void const * argument);
 void StartReadSensorTask(void const * argument);
@@ -126,11 +129,13 @@ int main(void)
   MX_USART1_UART_Init();
   MX_I2C2_Init();
   MX_TIM2_Init();
+  MX_QUADSPI_Init();
   /* USER CODE BEGIN 2 */
   BSP_TSENSOR_Init();
   BSP_MAGNETO_Init();
   BSP_PSENSOR_Init();
   BSP_GYRO_Init();
+  BSP_QSPI_Init();
   HAL_TIM_Base_Start_IT(&htim2);
 
   /* USER CODE END 2 */
@@ -282,6 +287,39 @@ static void MX_I2C2_Init(void)
 }
 
 /**
+  * @brief QUADSPI Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_QUADSPI_Init(void)
+{
+
+  /* USER CODE BEGIN QUADSPI_Init 0 */
+
+  /* USER CODE END QUADSPI_Init 0 */
+
+  /* USER CODE BEGIN QUADSPI_Init 1 */
+
+  /* USER CODE END QUADSPI_Init 1 */
+  /* QUADSPI parameter configuration*/
+  hqspi.Instance = QUADSPI;
+  hqspi.Init.ClockPrescaler = 255;
+  hqspi.Init.FifoThreshold = 1;
+  hqspi.Init.SampleShifting = QSPI_SAMPLE_SHIFTING_NONE;
+  hqspi.Init.FlashSize = 1;
+  hqspi.Init.ChipSelectHighTime = QSPI_CS_HIGH_TIME_1_CYCLE;
+  hqspi.Init.ClockMode = QSPI_CLOCK_MODE_0;
+  if (HAL_QSPI_Init(&hqspi) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN QUADSPI_Init 2 */
+
+  /* USER CODE END QUADSPI_Init 2 */
+
+}
+
+/**
   * @brief TIM2 Initialization Function
   * @param None
   * @retval None
@@ -374,6 +412,7 @@ static void MX_GPIO_Init(void)
 
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOC_CLK_ENABLE();
+  __HAL_RCC_GPIOE_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin : BLUE_BUTTON_Pin */

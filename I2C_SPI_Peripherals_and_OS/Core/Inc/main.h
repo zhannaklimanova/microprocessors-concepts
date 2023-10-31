@@ -35,6 +35,7 @@ extern "C" {
 #include "stm32l475e_iot01_magneto.h"
 #include "stm32l475e_iot01_psensor.h"
 #include "stm32l475e_iot01_gyro.h"
+#include "stm32l475e_iot01_qspi.h"
 #include <stdio.h>
 #include <string.h>
 /* USER CODE END Includes */
