@@ -35,6 +35,7 @@ extern "C" {
 #include "stm32l475e_iot01_magneto.h"
 #include "stm32l475e_iot01_psensor.h"
 #include "stm32l475e_iot01_gyro.h"
+#include "stm32l475e_iot01_qspi.h"
 #include <stdio.h>
 #include <string.h>
 /* USER CODE END Includes */
@@ -65,6 +66,8 @@ void Error_Handler(void);
 #define BLUE_BUTTON_Pin GPIO_PIN_13
 #define BLUE_BUTTON_GPIO_Port GPIOC
 #define BLUE_BUTTON_EXTI_IRQn EXTI15_10_IRQn
+#define LEDError_Pin GPIO_PIN_14
+#define LEDError_GPIO_Port GPIOD
 
 /* USER CODE BEGIN Private defines */
 
