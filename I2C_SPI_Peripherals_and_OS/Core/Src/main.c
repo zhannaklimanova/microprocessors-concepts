@@ -59,6 +59,23 @@ float psensor;
 float gyro[3];
 char bufferUART[98];
 
+typedef struct {
+	uint32_t tsensorBlock; // 4 bytes
+	struct magnetoBlock { // 12 bytes
+		uint32_t x;
+		uint32_t y;
+		uint32_t z;
+	} magnetoBlock;
+	uint32_t psensorBlock; // 4 bytes
+	struct gyroBlock { // 12 bytes
+		uint32_t x;
+		uint32_t y;
+		uint32_t z;
+	} gyroBlock;
+} flashAddresses;
+
+uint8_t flashBuffer[64000]; // stores 1 block which is 64KB
+
 enum ButtonStates
 {
 	NOT_PRESSED,
