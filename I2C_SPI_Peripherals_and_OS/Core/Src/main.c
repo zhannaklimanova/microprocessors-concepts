@@ -32,6 +32,7 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 #define FLASH_BLOCK 8
+#define ITM_Port32(n) (*((volatile unsigned long *) (0xE0000000+4*n)))
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -150,10 +151,12 @@ int main(void)
 		  {
 			  Error_Handler();
 		  }
+		  ITM_Port32(31) = 1;
 		  if (BSP_QSPI_Write(&writeIntegerValue, (uint32_t) FLASH_BLOCK, sizeof(writeIntegerValue)) != QSPI_OK)
 		  {
 			  Error_Handler();
 		  }
+		  ITM_Port32(31) = 2;
 		  if (BSP_QSPI_Read(&readIntegerValue, FLASH_BLOCK, sizeof(readIntegerValue)) != QSPI_OK)
 		  {
 			  Error_Handler();
