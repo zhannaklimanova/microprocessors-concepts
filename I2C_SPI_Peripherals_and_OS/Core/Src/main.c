@@ -32,7 +32,8 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define BLOCK_SIZE 64 * 1024 // 64 x 2^10
+#define WRITE_BUFFER_SIZE 8
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -53,28 +54,9 @@ osThreadId buttonTaskHandle;
 osThreadId TransmitUARTTasHandle;
 osThreadId ReadSensorTaskHandle;
 /* USER CODE BEGIN PV */
-float tsensor;
-int16_t magneto[3];
-float psensor;
-float gyro[3];
 char bufferUART[98];
-
-typedef struct {
-	uint32_t tsensorBlock; // 4 bytes
-	struct magnetoBlock { // 12 bytes
-		uint32_t x;
-		uint32_t y;
-		uint32_t z;
-	} magnetoBlock;
-	uint32_t psensorBlock; // 4 bytes
-	struct gyroBlock { // 12 bytes
-		uint32_t x;
-		uint32_t y;
-		uint32_t z;
-	} gyroBlock;
-} flashAddresses;
-
-uint8_t flashBuffer[64000]; // stores 1 block which is 64KB
+uint8_t writeBufferNextIndex = 0;
+uint8_t flashBuffer[BLOCK_SIZE]; // stores 1 block which is 64KB
 
 enum ButtonStates
 {
@@ -87,11 +69,77 @@ enum ProgramStates
 	TSENSOR,
 	MAGNETO,
 	PSENSOR,
-	GYRO
+	GYRO,
+	STATISTIC,
+	NOT_PRINTING
 };
 
+
+
+typedef struct {
+	uint32_t tsensor;
+	uint32_t psensor;
+	struct MagnetoAddresses {
+		uint32_t x;
+		uint32_t y;
+		uint32_t z;
+	}magneto;
+	struct GyroAddresses {
+		uint32_t x;
+		uint32_t y;
+		uint32_t z;
+	}gyro;
+} FlashSensorAddresses;
+
+typedef struct {
+	float tsensor[WRITE_BUFFER_SIZE];
+	float psensor[WRITE_BUFFER_SIZE];
+	struct MagnetoData {
+		int16_t x[WRITE_BUFFER_SIZE];
+		int16_t y[WRITE_BUFFER_SIZE];
+		int16_t z[WRITE_BUFFER_SIZE];
+	}magneto;
+	struct GyroData {
+		int16_t x[WRITE_BUFFER_SIZE];
+		int16_t y[WRITE_BUFFER_SIZE];
+		int16_t z[WRITE_BUFFER_SIZE];
+	}gyro;
+} SensorData;
+
+const FlashSensorAddresses FlashBlockStart = {
+		.psensor = BLOCK_SIZE * 0,
+		.tsensor = BLOCK_SIZE * 1,
+		.gyro = {
+				.x = BLOCK_SIZE * 2,
+				.y = BLOCK_SIZE * 3,
+				.z = BLOCK_SIZE * 4,
+		},
+		.magneto = {
+				.x = BLOCK_SIZE * 5,
+				.y = BLOCK_SIZE * 6,
+				.z = BLOCK_SIZE * 7,
+		},
+};
+
+FlashSensorAddresses currentAddress = {
+		.psensor = BLOCK_SIZE * 0,
+		.tsensor = BLOCK_SIZE * 1,
+		.gyro = {
+				.x = BLOCK_SIZE * 2,
+				.y = BLOCK_SIZE * 3,
+				.z = BLOCK_SIZE * 4,
+		},
+		.magneto = {
+				.x = BLOCK_SIZE * 5,
+				.y = BLOCK_SIZE * 6,
+				.z = BLOCK_SIZE * 7,
+		},
+};
+
+SensorData sensorData;
+
 enum ButtonStates buttonState = NOT_PRESSED;
-enum ProgramStates programState = TSENSOR;
+enum ProgramStates programState = NOT_PRINTING;
 
 /* USER CODE END PV */
 
@@ -112,7 +160,12 @@ void StartReadSensorTask(void const * argument);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
+void clearFlashBlock(uint32_t blockAddress);
+void clearFlashUsed(FlashSensorAddresses sensorAddresses);
+void writeBuffToFlash(uint32_t* blockAddress, uint32_t blockStart, uint8_t* writeBuffer, uint32_t size);
+void readFlashBlockToBuff(uint32_t* blockAddress, uint32_t blockStart, uint8_t* readBuffer, uint32_t size);
+void readSensor(SensorData* sensorData);
+void printStat();
 /* USER CODE END 0 */
 
 /**
@@ -154,6 +207,7 @@ int main(void)
   BSP_GYRO_Init();
   BSP_QSPI_Init();
   HAL_TIM_Base_Start_IT(&htim2);
+  clearFlashUsed(FlashBlockStart);
 
   /* USER CODE END 2 */
 
@@ -183,7 +237,7 @@ int main(void)
   TransmitUARTTasHandle = osThreadCreate(osThread(TransmitUARTTas), NULL);
 
   /* definition and creation of ReadSensorTask */
-  osThreadDef(ReadSensorTask, StartReadSensorTask, osPriorityNormal, 0, 128);
+  osThreadDef(ReadSensorTask, StartReadSensorTask, osPriorityNormal, 0, 256);
   ReadSensorTaskHandle = osThreadCreate(osThread(ReadSensorTask), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
@@ -456,16 +510,82 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
 	if (GPIO_Pin==BLUE_BUTTON_Pin)
 	{
-		switch(buttonState)
-		{
-			case NOT_PRESSED:
-				buttonState = PRESSED;
-				break;
-			default:
-				break;
-		}
+		buttonState = PRESSED;
 	}
 }
+
+void clearFlashBlock(uint32_t blockAddress)
+{
+	if (BSP_QSPI_Erase_Block(blockAddress) != QSPI_OK)
+	{
+		Error_Handler();
+	}
+}
+
+void clearFlashUsed(FlashSensorAddresses sensorAddresses)
+{
+	clearFlashBlock(sensorAddresses.gyro.x);
+	clearFlashBlock(sensorAddresses.gyro.y);
+	clearFlashBlock(sensorAddresses.gyro.z);
+	clearFlashBlock(sensorAddresses.magneto.x);
+	clearFlashBlock(sensorAddresses.magneto.y);
+	clearFlashBlock(sensorAddresses.magneto.z);
+	clearFlashBlock(sensorAddresses.psensor);
+	clearFlashBlock(sensorAddresses.tsensor);
+}
+
+
+
+void writeBuffToFlash(uint32_t* blockAddress, uint32_t blockStart, uint8_t* writeBuffer, uint32_t size)
+{
+	if ((*blockAddress - blockStart) >= BLOCK_SIZE)
+	{
+		clearFlashBlock(blockStart);
+		*blockAddress = blockStart;
+	}
+
+	if (BSP_QSPI_Write(writeBuffer, *blockAddress, size) != QSPI_OK)
+	{
+		Error_Handler();
+	}
+	*blockAddress += size;
+
+}
+
+void readFlashBlockToBuff(uint32_t* blockAddress, uint32_t blockStart, uint8_t* readBuffer, uint32_t size)
+{
+	uint8_t exitCode = BSP_QSPI_Read(readBuffer, blockStart, size);
+	if (exitCode != QSPI_OK){
+		Error_Handler();
+	}
+	*blockAddress = blockStart;
+	clearFlashBlock(blockStart);
+}
+
+void readSensor(SensorData* sensorData)
+{
+	if (writeBufferNextIndex == WRITE_BUFFER_SIZE) {
+		writeBufferNextIndex = 0;
+	}
+    sensorData->tsensor[writeBufferNextIndex] = BSP_TSENSOR_ReadTemp();
+    writeBufferNextIndex++;
+}
+
+void printStat()
+{
+	// temp print calc
+	uint32_t tsensorSampleSize = (currentAddress.tsensor - FlashBlockStart.tsensor) / sizeof(sensorData.tsensor[0]);
+	readFlashBlockToBuff(&(currentAddress.tsensor), FlashBlockStart.tsensor, flashBuffer, BLOCK_SIZE);
+	float32_t tsensorMean;
+	float32_t tsensorVAR;
+	arm_mean_f32((float32_t*)flashBuffer, tsensorSampleSize, &tsensorMean);
+	arm_var_f32((float32_t*)flashBuffer, tsensorSampleSize, &tsensorVAR);
+	memset(bufferUART, 0, sizeof(bufferUART)/sizeof(bufferUART[0]));
+	sprintf(bufferUART, "temp: %ld, %.4f, %.10f\r\n", tsensorSampleSize, tsensorMean, tsensorVAR);
+	HAL_UART_Transmit(&huart1, (uint8_t*)bufferUART, sizeof(bufferUART)/sizeof(bufferUART[0]), 1000);
+}
+
+
 
 /* USER CODE END 4 */
 
@@ -483,25 +603,19 @@ void StartButtonTask(void const * argument)
   for(;;)
   {
 	osDelay(500);
-	if (buttonState==PRESSED)
-	{
-	  switch(programState)
-	  {
-		  case TSENSOR:
-			  programState = MAGNETO;
-			  break;
-		  case MAGNETO:
-			  programState = PSENSOR;
-			  break;
-		  case PSENSOR:
-			  programState = GYRO;
-			  break;
-		  case GYRO:
-			  programState = TSENSOR;
-			  break;
-	  }
-	  buttonState = NOT_PRESSED;
+	if(buttonState == PRESSED){
+		switch (programState) {
+			case NOT_PRINTING:
+				programState = TSENSOR;
+				break;
+			case TSENSOR:
+				programState = STATISTIC;
+				break;
+			default:
+				break;
+		}
 	}
+	buttonState = NOT_PRESSED;
   }
   /* USER CODE END 5 */
 }
@@ -520,26 +634,17 @@ void StartTransmitUARTTask(void const * argument)
   for(;;)
   {
     osDelay(100);
-    switch(programState)
-    {
-    	case TSENSOR:
-    		memset(bufferUART, 0, sizeof(bufferUART)/sizeof(bufferUART[0]));
-			sprintf(bufferUART, "Temperature reading: %.2f\r\n", tsensor);
+    memset(bufferUART, 0, sizeof(bufferUART)/sizeof(bufferUART[0]));
+    switch (programState) {
+		case TSENSOR:
+			sprintf(bufferUART, "temp: %.2f\r\n", sensorData.tsensor[writeBufferNextIndex-1]);
 			break;
-    	case MAGNETO:
-    		memset(bufferUART, 0, sizeof(bufferUART)/sizeof(bufferUART[0]));
-    		sprintf(bufferUART, "Magneto reading xyz: %d, %d, %d\r\n", magneto[0], magneto[1], magneto[2]);
-    		break;
-    	case PSENSOR:
-    		memset(bufferUART, 0, sizeof(bufferUART)/sizeof(bufferUART[0]));
-    		sprintf(bufferUART, "Pressure reading: %.2f\r\n", psensor);
-    		break;
-    	case GYRO:
-    		memset(bufferUART, 0, sizeof(bufferUART)/sizeof(bufferUART[0]));
-    		sprintf(bufferUART, "Gyro reading xyz: %.2f, %.2f, %.2f\r\n", gyro[0], gyro[1], gyro[2]);
-    		break;
+		default:
+			break;
+	}
+    if (programState != NOT_PRINTING && programState != STATISTIC){
+    	HAL_UART_Transmit(&huart1, (uint8_t*)bufferUART, sizeof(bufferUART)/sizeof(bufferUART[0]), 1000);
     }
-    HAL_UART_Transmit(&huart1, (uint8_t*)bufferUART, sizeof(bufferUART)/sizeof(bufferUART[0]), 1000);
   }
   /* USER CODE END StartTransmitUARTTask */
 }
@@ -558,10 +663,15 @@ void StartReadSensorTask(void const * argument)
   for(;;)
   {
 	osDelay(100); // 10Hz or 0.1s
-	tsensor = BSP_TSENSOR_ReadTemp();
-	BSP_MAGNETO_GetXYZ(magneto);
-	psensor = BSP_PSENSOR_ReadPressure();
-	BSP_GYRO_GetXYZ(gyro);
+
+	if (programState == STATISTIC){
+		printStat();
+		programState = NOT_PRINTING;
+	}
+	readSensor(&sensorData);
+	if(writeBufferNextIndex == WRITE_BUFFER_SIZE){
+		writeBuffToFlash(&(currentAddress.tsensor), FlashBlockStart.tsensor, (uint8_t*)sensorData.tsensor, sizeof(sensorData.tsensor));
+	}
   }
   /* USER CODE END StartReadSensorTask */
 }

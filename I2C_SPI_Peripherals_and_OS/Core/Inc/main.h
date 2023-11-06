@@ -38,6 +38,7 @@ extern "C" {
 #include "stm32l475e_iot01_qspi.h"
 #include <stdio.h>
 #include <string.h>
+#include "arm_math.h"
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
