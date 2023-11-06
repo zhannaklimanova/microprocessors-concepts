@@ -529,9 +529,9 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 	}
 }
 
-void clearFlashBlock(uint32_t blockAddress)
+void clearFlashBlock(uint32_t flashBlockStart)
 {
-	if (BSP_QSPI_Erase_Block(blockAddress) != QSPI_OK)
+	if (BSP_QSPI_Erase_Block(flashBlockStart) != QSPI_OK)
 	{
 		Error_Handler();
 	}
@@ -591,10 +591,13 @@ void readSensor(SensorData* sensorData)
     sensorData->magneto.y[writeBufferNextIndex] = magneto[1];
     sensorData->magneto.z[writeBufferNextIndex] = magneto[2];
 
-    // TODO
+    sensorData->psensor[writeBufferNextIndex] = BSP_PSENSOR_ReadPressure();
 
-//	BSP_GYRO_GetXYZ(gyro);
-//	psensor = BSP_PSENSOR_ReadPressure();
+    float gyro[3];
+    BSP_GYRO_GetXYZ(gyro);
+    sensorData->gyro.x[writeBufferNextIndex] = gyro[0];
+    sensorData->gyro.y[writeBufferNextIndex] = gyro[1];
+    sensorData->gyro.z[writeBufferNextIndex] = gyro[2];
 
     writeBufferNextIndex++;
 }
@@ -617,20 +620,55 @@ void printStat()
 	sprintf(bufferUART, "magne.x: %ld, %d, %d\r\n", statisticI.numerSample, statisticI.mean, statisticI.variance);
 	HAL_UART_Transmit(&huart1, (uint8_t*)bufferUART, sizeof(bufferUART)/sizeof(bufferUART[0]), 1000);
 
+	calculateStatInt16(&(currentAddress.magneto.y), FlashBlockStart.magneto.y, &statisticI);
+	memset(bufferUART, 0, sizeof(bufferUART)/sizeof(bufferUART[0]));
+	sprintf(bufferUART, "magne.y: %ld, %d, %d\r\n", statisticI.numerSample, statisticI.mean, statisticI.variance);
+	HAL_UART_Transmit(&huart1, (uint8_t*)bufferUART, sizeof(bufferUART)/sizeof(bufferUART[0]), 1000);
+
+	calculateStatInt16(&(currentAddress.magneto.z), FlashBlockStart.magneto.z, &statisticI);
+	memset(bufferUART, 0, sizeof(bufferUART)/sizeof(bufferUART[0]));
+	sprintf(bufferUART, "magne.z: %ld, %d, %d\r\n", statisticI.numerSample, statisticI.mean, statisticI.variance);
+	HAL_UART_Transmit(&huart1, (uint8_t*)bufferUART, sizeof(bufferUART)/sizeof(bufferUART[0]), 1000);
+
+	// print psensor
+	calculateStatFloat(&(currentAddress.psensor), FlashBlockStart.psensor, &statisticF);
+	memset(bufferUART, 0, sizeof(bufferUART)/sizeof(bufferUART[0]));
+	sprintf(bufferUART, "pres: %ld, %.4f, %f\r\n", statisticF.numerSample, statisticF.mean, statisticF.variance);
+	HAL_UART_Transmit(&huart1, (uint8_t*)bufferUART, sizeof(bufferUART)/sizeof(bufferUART[0]), 1000);
+
+	// print gyro
+	calculateStatFloat(&(currentAddress.gyro.x), FlashBlockStart.gyro.x, &statisticF);
+	memset(bufferUART, 0, sizeof(bufferUART)/sizeof(bufferUART[0]));
+	sprintf(bufferUART, "gyro.x: %ld, %.2f, %.2f\r\n", statisticI.numerSample, statisticF.mean, statisticF.variance);
+	HAL_UART_Transmit(&huart1, (uint8_t*)bufferUART, sizeof(bufferUART)/sizeof(bufferUART[0]), 1000);
+
+	calculateStatFloat(&(currentAddress.gyro.y), FlashBlockStart.gyro.y, &statisticF);
+	memset(bufferUART, 0, sizeof(bufferUART)/sizeof(bufferUART[0]));
+	sprintf(bufferUART, "gyro.y: %ld, %.2f, %.2f\r\n", statisticF.numerSample, statisticF.mean, statisticF.variance);
+	HAL_UART_Transmit(&huart1, (uint8_t*)bufferUART, sizeof(bufferUART)/sizeof(bufferUART[0]), 1000);
+
+	calculateStatFloat(&(currentAddress.gyro.z), FlashBlockStart.gyro.z, &statisticF);
+	memset(bufferUART, 0, sizeof(bufferUART)/sizeof(bufferUART[0]));
+	sprintf(bufferUART, "gyro.z: %ld, %.2f, %.2f\r\n", statisticI.numerSample, statisticF.mean, statisticF.variance);
+	HAL_UART_Transmit(&huart1, (uint8_t*)bufferUART, sizeof(bufferUART)/sizeof(bufferUART[0]), 1000);
+
+
 }
 
 void calculateStatInt16(uint32_t *currentSensorAddress, uint32_t flashBlockStart, Statistic_int16 *statistic)
 {
-	statistic->numerSample = (*currentSensorAddress - flashBlockStart) / sizeof(int16_t);
-	readFlashBlockToBuff(currentSensorAddress, flashBlockStart, flashBuffer, BLOCK_SIZE);
+	const uint32_t size = (*currentSensorAddress - flashBlockStart);
+	statistic->numerSample = size / sizeof(int16_t);
+	readFlashBlockToBuff(currentSensorAddress, flashBlockStart, flashBuffer, size);
 	arm_mean_q15((q15_t*)flashBuffer, statistic->numerSample, (q15_t*)&(statistic->mean));
 	arm_var_q15((q15_t*)flashBuffer, statistic->numerSample, (q15_t*)&(statistic->variance));
 }
 
 void calculateStatFloat(uint32_t *currentSensorAddress, uint32_t flashBlockStart, Statistic_float *statistic)
 {
-	statistic->numerSample = (*currentSensorAddress - flashBlockStart) / sizeof(float);
-	readFlashBlockToBuff(currentSensorAddress, flashBlockStart, flashBuffer, BLOCK_SIZE);
+	const uint32_t size = (*currentSensorAddress - flashBlockStart);
+	statistic->numerSample = size / sizeof(float);
+	readFlashBlockToBuff(currentSensorAddress, flashBlockStart, flashBuffer, size);
 	arm_mean_f32((float32_t*)flashBuffer, statistic->numerSample, &(statistic->mean));
 	arm_var_f32((float32_t*)flashBuffer, statistic->numerSample, &(statistic->variance));
 }
@@ -662,6 +700,12 @@ void StartButtonTask(void const * argument)
 				programState = MAGNETO;
 				break;
 			case MAGNETO:
+				programState = PSENSOR;
+				break;
+			case PSENSOR:
+				programState = GYRO;
+				break;
+			case GYRO:
 				programState = STATISTIC;
 				break;
 			default:
@@ -687,13 +731,22 @@ void StartTransmitUARTTask(void const * argument)
   for(;;)
   {
     osDelay(100);
-    memset(bufferUART, 0, sizeof(bufferUART)/sizeof(bufferUART[0]));
     switch (programState) {
 		case TSENSOR:
+			memset(bufferUART, 0, sizeof(bufferUART)/sizeof(bufferUART[0]));
 			sprintf(bufferUART, "temperature: %.2f\r\n", sensorData.tsensor[writeBufferNextIndex-1]);
 			break;
 		case MAGNETO:
+			memset(bufferUART, 0, sizeof(bufferUART)/sizeof(bufferUART[0]));
 			sprintf(bufferUART, "magnetic: %d, %d, %d\r\n", sensorData.magneto.x[writeBufferNextIndex-1], sensorData.magneto.y[writeBufferNextIndex-1], sensorData.magneto.z[writeBufferNextIndex-1]);
+			break;
+		case PSENSOR:
+			memset(bufferUART, 0, sizeof(bufferUART)/sizeof(bufferUART[0]));
+			sprintf(bufferUART, "pressure: %.2f\r\n", sensorData.psensor[writeBufferNextIndex-1]);
+			break;
+		case GYRO:
+			memset(bufferUART, 0, sizeof(bufferUART)/sizeof(bufferUART[0]));
+			sprintf(bufferUART, "gyro: %.2f, %.2f, %.2f\r\n", sensorData.gyro.x[writeBufferNextIndex-1], sensorData.gyro.y[writeBufferNextIndex-1], sensorData.gyro.z[writeBufferNextIndex-1]);
 			break;
 		default:
 			break;
@@ -728,6 +781,12 @@ void StartReadSensorTask(void const * argument)
 	if(writeBufferNextIndex == WRITE_BUFFER_SIZE){
 		writeBuffToFlash(&(currentAddress.tsensor), FlashBlockStart.tsensor, (uint8_t*)sensorData.tsensor, sizeof(sensorData.tsensor));
 		writeBuffToFlash(&(currentAddress.magneto.x), FlashBlockStart.magneto.x, (uint8_t*)sensorData.magneto.x, sizeof(sensorData.magneto.x));
+		writeBuffToFlash(&(currentAddress.magneto.y), FlashBlockStart.magneto.y, (uint8_t*)sensorData.magneto.y, sizeof(sensorData.magneto.y));
+		writeBuffToFlash(&(currentAddress.magneto.z), FlashBlockStart.magneto.z, (uint8_t*)sensorData.magneto.z, sizeof(sensorData.magneto.z));
+		writeBuffToFlash(&(currentAddress.psensor), FlashBlockStart.psensor, (uint8_t*)sensorData.psensor, sizeof(sensorData.psensor));
+		writeBuffToFlash(&(currentAddress.gyro.x), FlashBlockStart.gyro.x, (uint8_t*)sensorData.gyro.x, sizeof(sensorData.gyro.x));
+		writeBuffToFlash(&(currentAddress.gyro.y), FlashBlockStart.gyro.y, (uint8_t*)sensorData.gyro.y, sizeof(sensorData.gyro.y));
+		writeBuffToFlash(&(currentAddress.gyro.z), FlashBlockStart.gyro.z, (uint8_t*)sensorData.gyro.z, sizeof(sensorData.gyro.z));
 	}
   }
   /* USER CODE END StartReadSensorTask */
